@@ -1,0 +1,155 @@
+%%%%%%%%%%%%%%%%%%%% book.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Self-Hosted AI Inference: A Systems Engineer's Guide
+% Main book file for Apress/Springer publication
+%
+%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% RECOMMENDED %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\documentclass[graybox,envcountchap,sectrefs]{svmono}
+
+% Package imports
+\usepackage{type1cm}
+\usepackage{makeidx}         % allows index generation
+\usepackage{graphicx}        % standard LaTeX graphics tool
+\usepackage{multicol}        % used for the two-column index
+\usepackage[bottom]{footmisc}% places footnotes at page bottom
+
+\usepackage{newtxtext}
+\usepackage[varvw]{newtxmath}% selects Times Roman as basic font
+
+% Additional packages for technical book
+\usepackage{listings}        % code listings
+\usepackage{xcolor}          % colors for code
+\usepackage{hyperref}        % hyperlinks
+\usepackage{booktabs}        % better tables
+\usepackage{longtable}       % multi-page tables
+\usepackage{amsmath}         % math extensions
+\usepackage{amssymb}         % math symbols
+
+% Code listing style for Go
+\lstdefinelanguage{Go}{
+  keywords={break, case, chan, const, continue, default, defer, else, fallthrough, for, func, go, goto, if, import, interface, map, package, range, return, select, struct, switch, type, var},
+  keywordstyle=\color{blue}\bfseries,
+  ndkeywords={string, int, int64, float64, bool, error, nil, true, false, context, Context},
+  ndkeywordstyle=\color{teal}\bfseries,
+  identifierstyle=\color{black},
+  sensitive=true,
+  comment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  commentstyle=\color{gray}\ttfamily,
+  stringstyle=\color{red}\ttfamily,
+  morestring=[b]',
+  morestring=[b]",
+  morestring=[b]`
+}
+
+% Code listing style defaults
+\lstset{
+  basicstyle=\small\ttfamily,
+  breakatwhitespace=false,
+  breaklines=true,
+  captionpos=b,
+  keepspaces=true,
+  numbers=left,
+  numbersep=5pt,
+  numberstyle=\tiny\color{gray},
+  showspaces=false,
+  showstringspaces=false,
+  showtabs=false,
+  tabsize=2,
+  frame=single,
+  framerule=0.5pt,
+  rulecolor=\color{gray},
+  backgroundcolor=\color{gray!5}
+}
+
+% Hyperref setup
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  filecolor=magenta,
+  urlcolor=cyan,
+  pdftitle={Self-Hosted AI Inference: A Systems Engineer's Guide},
+  pdfauthor={Author Name},
+  pdfsubject={AI Infrastructure, Machine Learning Operations},
+  pdfkeywords={AI, inference, LLM, GPU, self-hosted, control plane}
+}
+
+% Graphics path
+\graphicspath{{figures/}}
+
+% Index generation
+\makeindex
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+\author{Author Name}
+\title{Self-Hosted AI Inference}
+\subtitle{A Systems Engineer's Guide}
+\maketitle
+
+\frontmatter%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\include{frontmatter/dedication}
+\include{frontmatter/foreword}
+\include{frontmatter/preface}
+\include{frontmatter/acknowledgement}
+
+\tableofcontents
+
+\include{frontmatter/acronyms}
+
+\mainmatter%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Part I: Foundations (7B Models)
+\include{chapters/part1}
+\include{chapters/chapter01}
+\include{chapters/chapter02}
+\include{chapters/chapter03}
+\include{chapters/chapter04}
+\include{chapters/chapter05}
+\include{chapters/chapter05_5}
+
+% Part II: Production Deployment (30B Models)
+\include{chapters/part2}
+\include{chapters/chapter06}
+\include{chapters/chapter07}
+\include{chapters/chapter08}
+\include{chapters/chapter09}
+\include{chapters/chapter10}
+
+% Part III: Multi-Tenant Platform (70B Models)
+\include{chapters/part3}
+\include{chapters/chapter11}
+\include{chapters/chapter12}
+\include{chapters/chapter13}
+\include{chapters/chapter14}
+\include{chapters/chapter15}
+
+% Part IV: Inference Lab (400B Models)
+\include{chapters/part4}
+\include{chapters/chapter16}
+\include{chapters/chapter17}
+\include{chapters/chapter18}
+
+% Appendices
+\include{appendices/appendix_a}
+\include{appendices/appendix_b}
+\include{appendices/appendix_c}
+\include{appendices/appendix_d}
+\include{appendices/appendix_e}
+\include{appendices/appendix_f}
+\include{appendices/appendix_g}
+\include{appendices/appendix_h}
+
+\backmatter%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\include{backmatter/glossary}
+\include{backmatter/solutions}
+\printindex
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\end{document}

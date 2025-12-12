@@ -1,0 +1,103 @@
+%%%%%%%%%%%%%%%%%%%%% appendix_a.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Appendix A: Complete Control Plane Code Reference
+%
+%%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\appendix
+\chapter{Complete Control Plane Code Reference}
+\label{ch:appendix-code}
+
+This appendix provides complete code listings for the control plane implementation across all versions.
+
+% =============================================================================
+\section{Project Structure}
+\label{sec:project-structure}
+% =============================================================================
+
+\begin{programcode}{Directory Structure}
+\begin{lstlisting}[language=bash]
+inference-control-plane/
+├── cmd/
+│   └── server/
+│       └── main.go
+├── internal/
+│   ├── api/
+│   │   ├── handler.go
+│   │   ├── middleware.go
+│   │   └── routes.go
+│   ├── auth/
+│   │   ├── apikey.go
+│   │   ├── jwt.go
+│   │   └── middleware.go
+│   ├── backend/
+│   │   ├── backend.go
+│   │   ├── ollama.go
+│   │   └── vllm.go
+│   ├── billing/
+│   │   ├── meter.go
+│   │   └── stripe.go
+│   ├── cache/
+│   │   ├── cache.go
+│   │   ├── redis.go
+│   │   └── semantic.go
+│   ├── config/
+│   │   └── config.go
+│   ├── health/
+│   │   └── health.go
+│   ├── metrics/
+│   │   └── metrics.go
+│   ├── queue/
+│   │   ├── queue.go
+│   │   └── worker.go
+│   ├── ratelimit/
+│   │   ├── limiter.go
+│   │   └── middleware.go
+│   ├── router/
+│   │   └── router.go
+│   └── tenant/
+│       └── tenant.go
+├── deployments/
+│   └── docker/
+│       ├── Dockerfile
+│       └── docker-compose.yml
+├── configs/
+│   └── config.yaml
+└── go.mod
+\end{lstlisting}
+\end{programcode}
+
+% =============================================================================
+\section{Core Interfaces}
+\label{sec:core-interfaces-appendix}
+% =============================================================================
+
+% TODO: Complete interface listings
+
+% =============================================================================
+\section{v0.1 Implementation}
+\label{sec:v01-impl}
+% =============================================================================
+
+% TODO: Complete v0.1 code
+
+% =============================================================================
+\section{v0.2 Additions}
+\label{sec:v02-additions}
+% =============================================================================
+
+% TODO: Complete v0.2 code
+
+% =============================================================================
+\section{v0.3 Additions}
+\label{sec:v03-additions}
+% =============================================================================
+
+% TODO: Complete v0.3 code
+
+% =============================================================================
+\section{v1.0 Additions}
+\label{sec:v10-additions}
+% =============================================================================
+
+% TODO: Complete v1.0 code

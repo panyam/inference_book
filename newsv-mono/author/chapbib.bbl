@@ -1,0 +1,19 @@
+\begin{thebibliography}{2}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{{#1}}
+\providecommand{\urlprefix}{URL }
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{DOI~\discretionary{}{}{}#1}\else
+  \providecommand{\doi}{DOI~\discretionary{}{}{}\begingroup
+  \urlstyle{rm}\Url}\fi
+\providecommand{\eprint}[2][]{\url{#2}}
+
+\bibitem[{Duchesne and MacGregor(2004)}]{duchesne04}
+Duchesne C, MacGregor JF (2004) Establishing multivariate specification regions
+  for incoming materials. J Qual Technol 36(1):78--94
+
+\bibitem[{Kourti and MacGregor(1996)}]{kourti96}
+Kourti T, MacGregor JF (1996) {Multivariate SPC methods for process and product
+  monitoring}. J Qual Technol 28(4):409--428
+
+\end{thebibliography}

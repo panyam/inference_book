@@ -1,0 +1,160 @@
+%%%%%%%%%%%%%%%%%%%%% chapter11.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Chapter 11: Multi-Tenant Architecture
+%
+%%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Multi-Tenant Architecture}
+\label{ch:multi-tenant}
+
+\abstract*{Serving multiple organizations requires careful architectural decisions. This chapter covers tenant isolation strategies, data separation, resource allocation, and the organizational model that underlies a multi-tenant inference platform. We design a system that provides strong isolation while efficiently sharing underlying infrastructure.}
+
+\abstract{Serving multiple organizations requires careful architectural decisions. This chapter covers tenant isolation strategies, data separation, resource allocation, and the organizational model that underlies a multi-tenant inference platform. We design a system that provides strong isolation while efficiently sharing underlying infrastructure.}
+
+% =============================================================================
+\section{Multi-Tenancy Concepts}
+\label{sec:mt-concepts}
+% =============================================================================
+
+% TODO: Foundational concepts
+% - What is multi-tenancy
+% - Why it matters for inference
+% - Isolation vs sharing trade-offs
+
+% =============================================================================
+\section{Isolation Models}
+\label{sec:isolation-models}
+% =============================================================================
+
+\subsection{Shared Everything}
+\label{subsec:shared-everything}
+
+% TODO: Single pool approach
+% - All tenants share resources
+% - Simple but risky
+% - Noisy neighbor problem
+
+\subsection{Namespace Isolation}
+\label{subsec:namespace-isolation}
+
+% TODO: Logical separation
+% - Separate data but shared compute
+% - Good balance for most cases
+
+\subsection{Dedicated Resources}
+\label{subsec:dedicated-resources}
+
+% TODO: Physical separation
+% - Dedicated GPUs per tenant
+% - Maximum isolation
+% - Enterprise tier
+
+% =============================================================================
+\section{Tenant Data Model}
+\label{sec:tenant-model}
+% =============================================================================
+
+\begin{programcode}{Tenant Data Model}
+\begin{lstlisting}[language=Go]
+// internal/tenant/models.go
+
+type Tenant struct {
+    ID            string    `json:"id"`
+    Name          string    `json:"name"`
+    Tier          TenantTier `json:"tier"`
+    Status        TenantStatus `json:"status"`
+    Settings      TenantSettings `json:"settings"`
+    ResourceQuota ResourceQuota `json:"resource_quota"`
+    CreatedAt     time.Time `json:"created_at"`
+}
+
+type TenantTier string
+
+const (
+    TierFree       TenantTier = "free"
+    TierStarter    TenantTier = "starter"
+    TierPro        TenantTier = "pro"
+    TierEnterprise TenantTier = "enterprise"
+)
+
+type TenantSettings struct {
+    AllowedModels     []string `json:"allowed_models"`
+    MaxContextLength  int      `json:"max_context_length"`
+    CustomEndpoint    bool     `json:"custom_endpoint"`
+    DataRetention     int      `json:"data_retention_days"`
+    IsolationLevel    string   `json:"isolation_level"`
+}
+
+type ResourceQuota struct {
+    RequestsPerMinute   int   `json:"requests_per_minute"`
+    TokensPerMonth      int64 `json:"tokens_per_month"`
+    MaxConcurrent       int   `json:"max_concurrent"`
+    DedicatedGPUs       int   `json:"dedicated_gpus"`
+}
+\end{lstlisting}
+\end{programcode}
+
+% =============================================================================
+\section{Request Context}
+\label{sec:request-context}
+% =============================================================================
+
+% TODO: Propagating tenant info
+% - Tenant in context
+% - Throughout request lifecycle
+
+% =============================================================================
+\section{Resource Allocation}
+\label{sec:resource-allocation}
+% =============================================================================
+
+% TODO: Fair sharing
+
+\subsection{Shared Pool Model}
+\label{subsec:shared-pool}
+
+% TODO: Default approach
+
+\subsection{Reserved Capacity}
+\label{subsec:reserved-capacity}
+
+% TODO: Guaranteed minimums
+
+\subsection{Dynamic Allocation}
+\label{subsec:dynamic-allocation}
+
+% TODO: Based on demand
+
+% =============================================================================
+\section{Noisy Neighbor Prevention}
+\label{sec:noisy-neighbor}
+% =============================================================================
+
+% TODO: Preventing one tenant from affecting others
+% - Rate limiting per tenant
+% - Resource limits
+% - Queue isolation
+
+% =============================================================================
+\section{Summary}
+\label{sec:ch11-summary}
+% =============================================================================
+
+\begin{important}{Key Takeaways}
+\begin{itemize}
+\item Multi-tenancy enables efficient resource sharing
+\item Isolation level should match tenant tier
+\item Noisy neighbor problems require proactive prevention
+\item Tenant context must flow through the entire request
+\end{itemize}
+\end{important}
+
+\section*{Problems}
+\addcontentsline{toc}{section}{Problems}
+
+\begin{prob}
+\label{prob:ch11-tenant-service}
+Implement a \texttt{TenantService} that manages tenant lifecycle including creation, updates, and suspension.
+\end{prob}
+
+\input{chapters/references11}

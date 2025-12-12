@@ -1,0 +1,149 @@
+%%%%%%%%%%%%%%%%%%%%% chapter17.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Chapter 17: Building CodeLab - A Commercial AI Coding Assistant
+%
+%%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Building CodeLab: A Commercial AI Coding Assistant}
+\label{ch:codelab}
+
+\abstract*{This capstone chapter brings everything together to build CodeLab, a commercial-grade AI coding assistant. We cover the complete product architecture, IDE integration (VS Code, JetBrains), code completion and chat interfaces, context management, and productization. By the end, you'll have a working Copilot alternative running on your infrastructure.}
+
+\abstract{This capstone chapter brings everything together to build CodeLab, a commercial-grade AI coding assistant. We cover the complete product architecture, IDE integration (VS Code, JetBrains), code completion and chat interfaces, context management, and productization. By the end, you'll have a working Copilot alternative running on your infrastructure.}
+
+% =============================================================================
+\section{CodeLab Architecture}
+\label{sec:codelab-architecture}
+% =============================================================================
+
+% TODO: Overall architecture
+% - IDE extensions
+% - Gateway service
+% - Control plane
+% - Model backends
+
+% =============================================================================
+\section{Code Completion API}
+\label{sec:code-completion}
+% =============================================================================
+
+% TODO: Completion interface
+% - FIM (Fill-in-the-Middle)
+% - Context gathering
+% - Streaming responses
+
+\begin{programcode}{Code Completion API}
+\begin{lstlisting}[language=Go]
+// internal/codelab/completion.go
+
+type CompletionRequest struct {
+    Prefix      string `json:"prefix"`      // Code before cursor
+    Suffix      string `json:"suffix"`      // Code after cursor
+    Language    string `json:"language"`
+    FilePath    string `json:"file_path"`
+    MaxTokens   int    `json:"max_tokens"`
+}
+
+type CompletionResponse struct {
+    Completions []Completion `json:"completions"`
+}
+
+type Completion struct {
+    Text       string  `json:"text"`
+    Confidence float64 `json:"confidence"`
+}
+\end{lstlisting}
+\end{programcode}
+
+% =============================================================================
+\section{Chat Interface}
+\label{sec:chat-interface}
+% =============================================================================
+
+% TODO: Code-aware chat
+% - File context
+% - Repository context
+% - Action suggestions
+
+% =============================================================================
+\section{Context Management}
+\label{sec:context-management}
+% =============================================================================
+
+% TODO: Gathering context
+% - Current file
+% - Open files
+% - Related files
+% - Repository structure
+
+\subsection{RAG for Code}
+\label{subsec:code-rag}
+
+% TODO: Code embeddings
+% - Chunking strategies
+% - Retrieval
+
+% =============================================================================
+\section{VS Code Extension}
+\label{sec:vscode-extension}
+% =============================================================================
+
+% TODO: Building the extension
+% - Extension structure
+% - Inline completions API
+% - Chat participant API
+
+% =============================================================================
+\section{JetBrains Plugin}
+\label{sec:jetbrains}
+% =============================================================================
+
+% TODO: IntelliJ platform
+% - Plugin structure
+% - Completion provider
+
+% =============================================================================
+\section{Model Selection for Code}
+\label{sec:code-models}
+% =============================================================================
+
+% TODO: Best models for coding
+% - DeepSeek Coder
+% - CodeLlama
+% - Qwen Coder
+% - StarCoder
+
+% =============================================================================
+\section{Productization}
+\label{sec:productization}
+% =============================================================================
+
+% TODO: Making it a product
+% - User onboarding
+% - Telemetry
+% - Feedback loop
+% - Pricing
+
+% =============================================================================
+\section{Summary}
+\label{sec:ch17-summary}
+% =============================================================================
+
+\begin{important}{Key Takeaways}
+\begin{itemize}
+\item CodeLab demonstrates a complete commercial AI product
+\item IDE integration requires understanding extension APIs
+\item Context management is crucial for code quality
+\item Specialized code models outperform general-purpose
+\end{itemize}
+\end{important}
+
+\section*{Problems}
+\addcontentsline{toc}{section}{Problems}
+
+\begin{prob}
+\label{prob:ch17-extension}
+Build a minimal VS Code extension that provides code completion using your control plane API.
+\end{prob}
+
+\input{chapters/references17}

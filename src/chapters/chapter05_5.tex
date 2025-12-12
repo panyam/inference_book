@@ -1,0 +1,448 @@
+%%%%%%%%%%%%%%%%%%%%% chapter05_5.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Chapter 5.5: Edge Inference - Browser AI & Hybrid Architecture
+%
+%%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Edge Inference: Browser AI and Hybrid Architecture}
+\label{ch:browser-ai}
+
+\abstract*{This optional chapter explores browser-based inference as a way to achieve zero marginal cost at scale. We cover WebGPU and WebGL technologies, browser inference frameworks (WebLLM, Transformers.js), hybrid client-server architectures, and integration with your control plane. This approach is ideal for privacy-sensitive applications, offline capabilities, and cost optimization at scale.}
+
+\abstract{This optional chapter explores browser-based inference as a way to achieve zero marginal cost at scale. We cover WebGPU and WebGL technologies, browser inference frameworks (WebLLM, Transformers.js), hybrid client-server architectures, and integration with your control plane. This approach is ideal for privacy-sensitive applications, offline capabilities, and cost optimization at scale.}
+
+% =============================================================================
+\section{Why Browser Inference?}
+\label{sec:why-browser-inference}
+% =============================================================================
+
+% TODO: Motivation for browser-based inference
+
+\subsection{The Traditional Model's Limitations}
+\label{subsec:traditional-limitations}
+
+% TODO: Problems with server-only
+% - Every request costs GPU time
+% - Network latency
+% - Privacy concerns
+% - Scaling costs
+
+\subsection{The Browser Alternative}
+\label{subsec:browser-alternative}
+
+% TODO: Benefits
+% - Zero marginal cost
+% - Ultra-low latency
+% - Perfect privacy
+% - Infinite scale (user's device)
+% - Offline capable
+
+\subsection{When Browser Inference Makes Sense}
+\label{subsec:browser-use-cases}
+
+% TODO: Ideal use cases
+% - Privacy-critical applications
+% - High-volume, simple tasks
+% - Offline-first applications
+% - Latency-sensitive features
+% - Cost optimization (freemium products)
+
+\begin{svgraybox}
+\textbf{Ideal Browser Inference Use Cases:}
+\begin{itemize}
+\item Medical symptom checkers (privacy)
+\item Text classification and sentiment analysis (high volume)
+\item Mobile apps in low-connectivity areas (offline)
+\item Real-time autocomplete (latency)
+\item Freemium products with free tier (cost)
+\end{itemize}
+
+\textbf{When to Stick with Server:}
+\begin{itemize}
+\item Complex reasoning required (>7B model needed)
+\item Consistent quality critical
+\item Enterprise SLAs required
+\item Model must remain proprietary
+\end{itemize}
+\end{svgraybox}
+
+% =============================================================================
+\section{Browser Inference Technologies}
+\label{sec:browser-technologies}
+% =============================================================================
+
+% TODO: Web standards for AI
+
+\subsection{WebGPU}
+\label{subsec:webgpu}
+
+% TODO: Modern GPU API
+% - What it is
+% - Capabilities
+% - Browser support
+% - Detection code example
+
+\subsection{WebGL 2.0}
+\label{subsec:webgl}
+
+% TODO: Fallback option
+% - Performance vs WebGPU
+% - When to use
+
+\subsection{WebAssembly (WASM)}
+\label{subsec:wasm}
+
+% TODO: CPU inference
+% - When GPU unavailable
+% - Performance characteristics
+
+\subsection{WebNN (Future)}
+\label{subsec:webnn}
+
+% TODO: Upcoming standard
+% - Current status
+% - Future potential
+
+% =============================================================================
+\section{Browser Inference Frameworks}
+\label{sec:browser-frameworks}
+% =============================================================================
+
+% TODO: Framework comparison
+
+\subsection{WebLLM (MLC-LLM)}
+\label{subsec:webllm}
+
+% TODO: Best for production LLMs
+% - Features
+% - Performance
+% - Code example
+
+\begin{programcode}{WebLLM Example}
+\begin{lstlisting}[language=JavaScript]
+import { CreateMLCEngine } from "@mlc-ai/web-llm";
+
+const engine = await CreateMLCEngine(
+    "Phi-3-mini-4k-instruct-q4f16_1",
+    {
+        initProgressCallback: (progress) => {
+            console.log(`Loading: ${progress.progress}%`);
+        }
+    }
+);
+
+// Chat-style API
+const reply = await engine.chat.completions.create({
+    messages: [
+        { role: "user", content: "Write a Python function" }
+    ],
+    stream: true,
+});
+
+// Handle streaming
+for await (const chunk of reply) {
+    console.log(chunk.choices[0]?.delta?.content || "");
+}
+\end{lstlisting}
+\end{programcode}
+
+\subsection{Transformers.js}
+\label{subsec:transformersjs}
+
+% TODO: HuggingFace's solution
+% - Ease of use
+% - Model support
+% - Code example
+
+\subsection{ONNX Runtime Web}
+\label{subsec:onnx-web}
+
+% TODO: Cross-platform
+% - Custom model support
+% - Lower-level control
+
+\subsection{Framework Comparison}
+\label{subsec:framework-comparison}
+
+% TODO: Comparison table
+% | Feature | Transformers.js | WebLLM | ONNX Runtime |
+% | Ease of use | 5/5 | 4/5 | 3/5 |
+% | Performance | 3/5 | 5/5 | 4/5 |
+% | Streaming | 2/5 | 5/5 | 2/5 |
+% | etc. |
+
+% =============================================================================
+\section{Model Selection for Browser}
+\label{sec:browser-model-selection}
+% =============================================================================
+
+% TODO: Size constraints
+
+\subsection{Device Constraints}
+\label{subsec:device-constraints}
+
+% TODO: What fits where
+% - Mobile: 500MB-1GB models
+% - Desktop: 1-4GB models
+% - High-end: Up to 7B Q4
+
+\subsection{Recommended Models}
+\label{subsec:browser-recommended-models}
+
+% TODO: Specific recommendations
+% - TinyLlama for mobile
+% - Phi-3-mini for desktop
+% - Qwen Coder for code tasks
+
+% =============================================================================
+\section{Capability Detection}
+\label{sec:capability-detection}
+% =============================================================================
+
+% TODO: Detecting what the device can run
+
+\begin{programcode}{Capability Detection}
+\begin{lstlisting}[language=JavaScript]
+async function detectCapabilities() {
+    const capabilities = {
+        hasWebGPU: false,
+        hasWebGL2: false,
+        gpuTier: "none",
+        estimatedRAMGB: 4,
+        isMobile: false
+    };
+
+    // Check WebGPU
+    if (navigator.gpu) {
+        try {
+            const adapter = await navigator.gpu.requestAdapter();
+            capabilities.hasWebGPU = !!adapter;
+        } catch {}
+    }
+
+    // Check WebGL2
+    const canvas = document.createElement('canvas');
+    capabilities.hasWebGL2 = !!canvas.getContext('webgl2');
+
+    // Detect device type
+    capabilities.isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+
+    // Estimate RAM
+    if (navigator.deviceMemory) {
+        capabilities.estimatedRAMGB = navigator.deviceMemory * 0.5;
+    }
+
+    return capabilities;
+}
+\end{lstlisting}
+\end{programcode}
+
+% =============================================================================
+\section{Building the Hybrid Client}
+\label{sec:hybrid-client}
+% =============================================================================
+
+% TODO: Client that chooses browser vs server
+
+\subsection{Architecture}
+\label{subsec:hybrid-architecture}
+
+% TODO: Decision flow
+% 1. Detect capabilities
+% 2. Ask server for routing decision
+% 3. Execute in browser or server
+% 4. Report analytics
+
+\subsection{Routing Decision API}
+\label{subsec:routing-decision}
+
+% TODO: Server-side routing logic
+
+\subsection{Client Implementation}
+\label{subsec:client-implementation}
+
+% TODO: Full hybrid client code
+
+% =============================================================================
+\section{Control Plane Integration}
+\label{sec:browser-control-plane}
+% =============================================================================
+
+% TODO: Adding browser support to control plane
+
+\subsection{Browser Routing Endpoint}
+\label{subsec:browser-routing-endpoint}
+
+\begin{programcode}{Browser Router (Go)}
+\begin{lstlisting}[language=Go]
+// internal/browser/router.go
+
+type HybridRouter struct {
+    modelRegistry BrowserModelRegistry
+    config        HybridConfig
+}
+
+type RoutingDecision struct {
+    UseBrowser bool              `json:"useBrowser"`
+    Reason     string            `json:"reason"`
+    ModelInfo  *BrowserModelInfo `json:"modelInfo,omitempty"`
+}
+
+func (r *HybridRouter) Route(
+    ctx context.Context,
+    req RoutingRequest,
+) (RoutingDecision, error) {
+    // Check if browser inference is enabled
+    if !r.config.EnableBrowserInference {
+        return RoutingDecision{
+            UseBrowser: false,
+            Reason:     "browser_inference_disabled",
+        }, nil
+    }
+
+    // Check device capabilities
+    if !r.hasMinimumCapabilities(req.Capabilities) {
+        return RoutingDecision{
+            UseBrowser: false,
+            Reason:     "insufficient_device_capabilities",
+        }, nil
+    }
+
+    // Check request complexity
+    if r.estimateComplexity(req) > ComplexityMedium {
+        return RoutingDecision{
+            UseBrowser: false,
+            Reason:     "request_too_complex",
+        }, nil
+    }
+
+    // Find compatible browser model
+    models, _ := r.modelRegistry.ListCompatible(req.Capabilities)
+    if len(models) == 0 {
+        return RoutingDecision{
+            UseBrowser: false,
+            Reason:     "no_compatible_browser_model",
+        }, nil
+    }
+
+    return RoutingDecision{
+        UseBrowser: true,
+        Reason:     "optimal_for_browser",
+        ModelInfo:  &models[0],
+    }, nil
+}
+\end{lstlisting}
+\end{programcode}
+
+\subsection{Browser Model Registry}
+\label{subsec:browser-model-registry}
+
+% TODO: Managing browser-capable models
+
+\subsection{Analytics Collection}
+\label{subsec:browser-analytics}
+
+% TODO: Tracking browser inference usage
+
+% =============================================================================
+\section{Performance and Economics}
+\label{sec:browser-economics}
+% =============================================================================
+
+% TODO: Expected performance and cost savings
+
+\subsection{Performance Expectations}
+\label{subsec:performance-expectations}
+
+% TODO: Tokens/sec by device
+% - iPhone: 10-15 tok/s (1B model)
+% - M1 MacBook: 25-30 tok/s (3B model)
+% - Gaming PC: 35-45 tok/s (7B model)
+
+\subsection{Cost Analysis}
+\label{subsec:browser-cost-analysis}
+
+% TODO: Compare server vs hybrid costs
+% - 10,000 users example
+% - 80% browser, 20% server
+% - 78% cost reduction
+
+% =============================================================================
+\section{Best Practices}
+\label{sec:browser-best-practices}
+% =============================================================================
+
+% TODO: Patterns for success
+
+\subsection{Progressive Enhancement}
+\label{subsec:progressive-enhancement}
+
+% TODO: Start server, upgrade to browser
+
+\subsection{User Control}
+\label{subsec:user-control}
+
+% TODO: Let users choose
+
+\subsection{Battery Awareness}
+\label{subsec:battery-awareness}
+
+% TODO: Respect battery status
+
+\subsection{Caching Strategy}
+\label{subsec:browser-caching}
+
+% TODO: Model caching
+
+% =============================================================================
+\section{Limitations and Challenges}
+\label{sec:browser-limitations}
+% =============================================================================
+
+% TODO: Honest assessment
+% - Model size limits
+% - Performance variability
+% - Browser compatibility
+% - Battery drain
+% - Storage quotas
+
+% =============================================================================
+\section{Summary}
+\label{sec:ch055-summary}
+% =============================================================================
+
+\begin{important}{Key Takeaways}
+\begin{itemize}
+\item Browser inference enables zero marginal cost at scale
+\item WebGPU + WebLLM provide production-ready browser inference
+\item Hybrid architecture uses browser when possible, server when needed
+\item Cost savings of 60-80\% are achievable with hybrid approach
+\item Privacy is a killer feature---data never leaves the device
+\item UX matters: manage load times and set expectations
+\end{itemize}
+\end{important}
+
+% =============================================================================
+\section*{Problems}
+\addcontentsline{toc}{section}{Problems}
+% =============================================================================
+
+\begin{prob}
+\label{prob:ch055-hybrid-client}
+\textbf{Hybrid Client Implementation}\\
+Build a complete hybrid inference client in TypeScript that detects device capabilities, consults the control plane for routing decisions, and executes inference either locally or via API.
+\end{prob}
+
+\begin{prob}
+\label{prob:ch055-cost-comparison}
+\textbf{Cost Comparison Analysis}\\
+For a hypothetical application with 50,000 users making 20 requests/day, calculate the monthly cost for: (a) server-only, (b) hybrid 50/50, and (c) hybrid 80/20 browser/server. Include hardware, power, and bandwidth costs.
+\end{prob}
+
+\begin{prob}
+\label{prob:ch055-browser-benchmark}
+\textbf{Browser Performance Benchmark}\\
+Using WebLLM, benchmark inference speed across three different devices (mobile, laptop, desktop). Document tokens/second, time-to-first-token, and memory usage for each.
+\end{prob}
+
+\input{chapters/references05_5}

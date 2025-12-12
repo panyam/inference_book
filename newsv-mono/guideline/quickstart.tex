@@ -1,0 +1,271 @@
+%%%%%%%%%%%%%%%%%%%% author.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% sample root file for your "contribution" to a contributed volume
+%
+% Use this file as a template for your own input.
+%
+%%%%%%%%%%%%%%%% Springer %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+% RECOMMENDED %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\documentclass[graybox]{svmono}
+\usepackage{array}
+%\usepackage{showframe}
+% choose options for [] as required from the list
+% in the Reference Guide
+
+
+%\usepackage{mathptmx}       % selects Times Roman as basic font
+%\usepackage{helvet}         % selects Helvetica as sans-serif font
+%\usepackage{courier}        % selects Courier as typewriter font
+\usepackage{type1cm}        % activate if the above 3 fonts are
+\usepackage{nicefrac}
+                            % not available on your system
+%
+\usepackage{makeidx}         % allows index generation
+\usepackage{graphicx}        % standard LaTeX graphics tool
+                             % when including figure files
+\usepackage{multicol}        % used for the two-column index
+\usepackage[bottom]{footmisc}% places footnotes at page bottom
+
+\usepackage{newtxtext}       %
+\usepackage[varvw]{newtxmath}       % selects Times Roman as basic font
+
+\usepackage{hyperref}
+\usepackage{cprotect}
+%\def\ttdefault{cmtt}
+
+\pagestyle{plain}
+
+% see the list of further useful packages
+% in the Reference Guide
+
+\makeindex             % used for the subject index
+                       % please use the style svind.ist with
+                       % your makeindex program
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\parindent=0pt%
+\parskip=1em%
+\raggedbottom%
+
+\def\thechapter{\vspace*{-2pc}}
+\def\chaptername{}
+
+\begin{document}
+
+\chapter{Quick Start -- SVMono}
+
+%\author{}
+
+%\maketitle
+
+\begin{sloppy}
+
+
+
+\vspace*{-12pc}
+
+\def\thechapter{\arabic{chapter}}
+\section{Setting up your File and Document Structure}
+
+Save each single chapter as an individual file.
+
+Set up a {\it root} file complete with all commands needed to invoke the class, the
+packages and your own declarations and commands.
+
+Use the declarations
+\cprotect\boxtext{\begin{tabular}{l}\verb|\frontmatter|\\
+\verb|\mainmatter|\\
+\verb|\backmatter|\end{tabular}}
+
+
+in the root file to divide your manuscript into three parts: (1) the {\it front matter}
+for the dedication, foreword, preface, table of contents, and list of acronyms; (2)
+the {\it main matter} for the main body of your book including appendices; (3) the
+{\it back matter} for the glossary, references, and index.
+
+Insert the individual chapter files with the \verb|\include| command.
+
+Use this root file for the compilation of your manuscript.
+
+\section{Initializing the Class}
+
+To format a {\it monograph} enter
+
+\cprotect\boxtext{\verb|\documentclass{svmono}|}
+
+\vspace*{-5pc}
+\hspace*{28pc}\,{\it Tip}: \\
+\hspace*{28pc} \hbox{Use the pre-set}\\
+\hspace*{28pc} \hbox{templates}\\
+
+at the beginning of your input.
+
+%This will set the text area to a \verb|\textwidth| of 117 mm or 27-3/4 pi pi and a \verb|\textheight| of 191 mm or 45-1/6 pi plus a \verb|\headsep| of 12 pt (space between the running head and text).
+
+%{\it N.B.} Trim size (physical paper size) is $155 \times 235$ mm or $6\nicefrac{1}{8} \times 9\nicefrac{1}{4}$ in.
+
+Please refer Section 1.6 ``SN Books Trim Size Table'' for all Book Trim Size like Regular/Medium/Large/Huge. 
+
+
+For a description of all possible class options provided by {\sc SVMono} see the
+``{\sc SVMono} Class Options'' section in the enclosed {\it Reference Guide.}
+
+\clearpage
+
+\section{Required Packages}
+
+The following selection has proved to be essential in preparing a manuscript in
+the Springer layout.
+
+Invoke the required packages with the command
+
+\cprotect\boxtext{\verb|\usepackage{}|}
+
+\begin{tabular}{p{7.5pc}@{\qquad}p{18.5pc}}
+{\tt newtxtext.sty} and {\tt newtxmath.sty} & Supports roman text font provided by a Times clone,  sans serif based on a Helvetica clone,  typewriter faces,  plus math symbol fonts whose math italic letters are from a Times Italic clone\\
+{\tt makeidx.sty} &  provides  and interprets the command  \verb|\printindex|  which ``prints'' the index file *.ind (compiled by an index processor) on a chosen page\\
+{\tt graphicx.sty} & is a powerful tool for including, rotating, scaling and sizing graphics files (preferably *.eps files)\\
+{\tt multicol.sty} & balances out the columns on the last page of, for example, your subject index\\
+{\tt footmisc.sty}  & together with style option {\tt [bottom]} places all\break footnotes at the bottom of the page
+\end{tabular}
+
+For a description of other useful packages and {\sc SVMono} class options, special commands and environments tested with the {\sc SVMono} document class see the {\it Reference Guide}.
+
+For a detailed description of how to fine-tune your text, mathematics, and references, of how to process your illustrations, and of how to set up your tables, see the enclosed {\it Author Instructions}.
+
+
+
+\section{Best Practice Guidelines for \LaTeX\ Manuscripts}\thispagestyle{empty}\markboth{Best Practice Guidelines for \LaTeX\ Manuscripts}{Best Practice Guidelines for \LaTeX\ Manuscripts}
+
+\noindent Please note that observing the following details in creating your manuscript will promote smooth production of your work:
+\begin{itemize}
+\item	Please ensure your \LaTeX\ file can be compiled without errors in a recent version of \LaTeX. We recommend uploading the manuscript to \href{https:\\www.overleaf.com}{Overleaf} (free service) and running the compiler there.
+\item Please avoid including multiple levels of linked sub-files. Well-organized file structure and clear file names improve handling enormously. 
+\item Please avoid macro packages which change standard layout and enumeration settings, such as \verb|fancyhdr|, \verb|a4wide|, \verb|enumerate|, and \verb|enumitem|. These will have to be replaced with standard settings during production.
+\item The use of \verb|\def| is not recommended. Instead, please replace all instances with the appropriate \verb|\newcommand|. This prevents existing commands being inadvertently replaced, producing unexpected errors (more explanation below). 
+\item Please use standard \LaTeX\ commands consistently for character emphasis, such as \verb|\mathbb|, \verb|\mathcal|, or \verb|\mathfrak| and avoid including additional font-related packages such as \verb|bbm|, \verb|dsfonts|, \verb|eucal|, \verb|mathrsfs|, \verb|mathabx|, and \verb|mathtools|.
+\item The \verb|\text{...}| command is recommended for text in math environments rather than \verb|\mbox| or \verb|\hbox| constructions.
+\item Please do not use color for emphasis in running text, particularly not the \verb|xcolor| package (see below for further explanation). As an exception, color may be used for highlighting syntax in code listings.
+\item Images should always be separated from the text (using proper \verb|\includegraphics| commands), must have a caption and must be referenced in the text. Please do not use \verb|wrapfigure| or \verb|subfigure|.
+\item Please note that where \verb|tikz| or \verb|xy| packages (or similar ones creating diagram-like structures) are used, the output cannot be created on the fly for all publication formats produced, but only for PDF. For all other formats, the output has to be included as an image instead (see further details below).
+\item Please do not use \verb|\pageref|, as this will lead to dead links in some output formats, since page orientation is only valid for the PDF (see explanations below).
+\item Please avoid linking back to the manuscript from the bibliography, and do not include footnotes in the bibliography.
+\end{itemize}
+
+\subsection*{Why are we asking you to observe these restrictions?}
+
+\noindent We are publishing and distributing your work not only in PDF, but also in other digital/online versions such as html and epub, which are based on XML, the industry standard for data exchange. Using XML as a basis allows us to provide data to other specific interfaces such as Braille machines as well as indexing, abstracting and library services. Satisfying all the requirements of these formats dictates many of the above restrictions, as these are produced from the \LaTeX\ version. The functions and packages that are not recommended in the guidelines above may work in the PDF output, but not beyond that. Although the name PDF (Portable Document Format) suggests portability, it actually depends on the output medium: a professional postscript printer might not produce the same result as a local printer at home or at a department. A prime example of the limitations is that not all aspects of the page-oriented PDF output can be mirrored in other formats. This often requires the source to be adapted to allow all output formats to be produced from it.\medskip 
+
+\noindent\textbf{Examples:}
+\begin{itemize}
+\item Constructs such as 
+$$\verb|$X+nY=0 \quad\hbox{for all $n>0$}$|$$
+will not work properly and need to be replaced manually; instead use
+
+$$\verb|$X+nY=0 \text{ for all } n>0$|$$
+to avoid nesting math environments. Note that the \verb|\text| command also adds proper horizontal spacing.
+\item The command \verb|\r| is already predefined as an internal command in \TeX; if you want to define the set of real numbers and use, e.g., \verb|\def\r{\mathbb{R}}|, this internal command is overwritten. If you use \verb|\newcommand{\r}{\mathbb{R}}| for the same purpose, it will result in an error stating that \verb|\r| is already defined. To avoid this, you could use \verb|\newcommand{\R}{\mathbb{R}}| which would work well, but of course all instances of \verb|\r| in your document need to be replaced by \verb|\R|. Avoid using \verb|\renewcommand|.
+\item Commands such as \verb|\enlargethispage| or \verb|\pagebreak|, etc. only work with a fixed output page size which is not valid for all formats. Such commands are then either ignored or produce strange breaks.
+\item Using too many fonts can produce errors in some output formats due to a restriction on the number of fonts that can be used simultaneously. Hence, please consider carefully which fonts are really needed and use these consistently in your manuscript. Also, please do not use fonts that have no proper postscript version as these cannot be handled by professional printers. Avoid the set of so-called Type 3 Postscript fonts, which sometimes occur in specific packages or in figures, as their characters will be omitted in the output. To check whether the document includes such Type 3 fonts, refer to the fonts tab in ``Document Properties'' in \href{https://get.adobe.com/reader/}{Adobe's Acrobat Reader}: this will list all fonts used and whether these are Type 1, True Type (both of which are ok), or Type 3. 
+\item Colors are problematic with regard to accessibility (lack of sufficient contrast between colors) and for other output formats, as colors cannot be freely integrated there. Such passages have to be embedded as images, which in turn will reduce readability. If, nevertheless, specific colors need to be defined, please include CMYK definitions of these colors as - depending on the output - some output drivers such as professional printers cannot deal with RGB colors. E.g.,
+\begin{verbatim}
+\definecolor{ultramarine}{RGB}{1,1,1}
+%%\definecolor{ultramarine}{cmyk}{0,0,0,1}
+
+\textcolor{ultramarine}{Colored text}
+\end{verbatim}
+\item For typesetting algorithms, please use either the \verb|algorithms2e| package or ONE of the (\verb|algpseudocode| OR \verb|algcompatible| OR \verb|algorithmic|) packages to typeset algorithm bodies and the \verb|algorithm| package for captioning the algorithm.
+\item If you use the \verb|newtxmath| package, do NOT include the \verb|amsmath| package separately.
+\item Please try to avoid the \verb|tikz|, \verb|xy|, and \verb|pstricks| packages if possible. These graphs/figures cannot be rendered in our other output formats, therefore can only be included there as rendered image files of a fixed resolution.
+\item Caution with packages which embed page-like structures within layout elements, such as \verb|multicol| or \verb|minipage| (sometimes used to create specific layout within \verb|\mbox| or \verb|\parbox|). These can cause significant problems for some output formats or can only be rendered as images.
+\end{itemize}
+
+\section{SN Books Trim Size Table}
+
+{\fontsize{7}{9}\selectfont%
+\def\arraystretch{1.5}%
+\tabcolsep=3pt\begin{tabular}{|p{9.4pc}<{\raggedright}|p{2pc}<{\raggedright}|p{2pc}<{\raggedright}|p{3.3pc}<{\raggedright}|p{4.5pc}<{\raggedright}|p{6pc}|}
+\hline
+Package Option
+&Column width
+&Max. column height
+&Two-thirds column width\hfill\break (only for\hfill\break figures)
+&Format size on final print
+&Description\\
+\hline
+{\bf RBook}\hfill\break
+\verb|\documentclass[RBook..]{svmono}|
+&117 mm
+&190 mm
+&78 mm
+&155 mm x 235 mm
+&Regular page size book\\
+\hline
+{\bf MBook}\hfill\break
+\verb|\documentclass[MBook..]{svmono}|
+&126 mm
+&192 mm
+&82 mm
+&168 mm x 240 mm
+&Medium page size book\\
+\hline
+{\bf LBook}\hfill\break
+\verb|\documentclass[LBook..]{svmono}|
+&142 mm
+&211 mm
+&33 mm
+&178 mm x 254 mm
+&Large page size book\\
+\hline
+{\bf HBook}\hfill\break
+\verb|\documentclass[HBook..]{svmono}|
+&174 mm
+&234 mm
+&40.5 mm
+&210 mm x 279 mm
+&Huge page size book\\
+\hline
+\end{tabular}}
+
+%{\fontsize{7}{9}\selectfont%
+%\def\arraystretch{1.5}%
+%\tabcolsep=3pt\begin{tabular}{|p{9.6pc}<{\raggedright}|p{2pc}<{\raggedright}|p{2pc}<{\raggedright}|p{2pc}<{\raggedright}|p{3pc}<{\raggedright}|p{4.5pc}<{\raggedright}|p{5pc}|}
+%\hline
+%Package Option
+%&Column width
+%&Max. column height
+%&Column width
+%&Sub-column width
+%&Format size on final print
+%&Description\\
+%\hline
+%{\bf LBook}\hfill\break
+%\verb|\documentclass[LBook..]{svmono}|
+%&142 mm
+%&211 mm
+%&69 mm
+%&33 mm
+%&178 mm x 254 mm
+%&Large page size book\\
+%\hline
+%{\bf HBook}\hfill\break
+%\verb|\documentclass[HBook..]{svmono}|
+%&174 mm
+%&234 mm
+%&85 mm
+%&40.5 mm
+%&210 mm x 279 mm
+%&Huge page size book\\
+%\hline
+%\end{tabular}}
+
+\end{sloppy}
+
+
+
+
+\end{document}

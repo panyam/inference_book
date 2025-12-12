@@ -1,0 +1,298 @@
+%%%%%%%%%%%%%%%%%%%%% chapter02.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Chapter 2: Hardware Fundamentals
+%
+%%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Hardware Fundamentals}
+\label{ch:hardware}
+
+\abstract*{Understanding hardware is essential for making informed decisions about self-hosted inference. This chapter covers how transformers use memory during inference, VRAM calculation formulas, CPU vs GPU trade-offs, and a comprehensive comparison of available hardware options. We also analyze the economics of owned versus rented infrastructure to help you make the right choice for your situation.}
+
+\abstract{Understanding hardware is essential for making informed decisions about self-hosted inference. This chapter covers how transformers use memory during inference, VRAM calculation formulas, CPU vs GPU trade-offs, and a comprehensive comparison of available hardware options. We also analyze the economics of owned versus rented infrastructure to help you make the right choice for your situation.}
+
+% =============================================================================
+\section{How Transformers Use Memory}
+\label{sec:transformer-memory}
+% =============================================================================
+
+% TODO: Explain memory usage during inference
+% - Model weights
+% - KV cache
+% - Activation memory
+% - Working memory
+
+\subsection{Model Weights}
+\label{subsec:model-weights}
+
+% TODO: Weight storage
+% - Parameters and precision
+% - Memory formula: params × bytes_per_param
+% - Example calculations
+
+\subsection{The KV Cache}
+\label{subsec:kv-cache}
+
+% TODO: Explain KV cache
+% - What it stores
+% - Why it grows with context
+% - Memory formula for KV cache
+% - Why it matters for long contexts
+
+\subsection{Activation and Working Memory}
+\label{subsec:activation-memory}
+
+% TODO: Other memory needs
+% - Intermediate activations
+% - Batch processing overhead
+% - Safety margins
+
+% =============================================================================
+\section{VRAM Calculation}
+\label{sec:vram-calculation}
+% =============================================================================
+
+% TODO: The master formula
+
+\begin{svgraybox}
+\textbf{VRAM Estimation Formula:}
+
+For a model with $P$ parameters at precision $B$ bytes:
+
+\begin{equation}
+\text{VRAM}_{\text{base}} = P \times B
+\end{equation}
+
+For inference with context length $C$ and batch size $N$:
+
+\begin{equation}
+\text{VRAM}_{\text{total}} \approx P \times B + \text{KV\_cache}(C, N) + \text{overhead}
+\end{equation}
+
+Where overhead is typically 10--20\% additional memory.
+\end{svgraybox}
+
+\subsection{Precision and Memory}
+\label{subsec:precision}
+
+% TODO: Table of precision formats
+% | Precision | Bytes | Use Case |
+% | FP32 | 4 | Training (rarely inference) |
+% | FP16 | 2 | Standard GPU inference |
+% | BF16 | 2 | Standard GPU inference |
+% | INT8 | 1 | Quantized inference |
+% | INT4 | 0.5 | Aggressive quantization |
+
+\subsection{Worked Examples}
+\label{subsec:vram-examples}
+
+% TODO: Calculate for our target models
+% - 7B model at different precisions
+% - 30B model requirements
+% - 70B model requirements
+% - 400B model requirements
+
+% =============================================================================
+\section{CPU vs GPU Inference}
+\label{sec:cpu-vs-gpu}
+% =============================================================================
+
+% TODO: When each makes sense
+
+\subsection{CPU Inference}
+\label{subsec:cpu-inference}
+
+% TODO: CPU characteristics
+% - Larger memory (RAM vs VRAM)
+% - Lower throughput
+% - llama.cpp optimization
+% - When it works well
+
+\subsection{GPU Inference}
+\label{subsec:gpu-inference}
+
+% TODO: GPU advantages
+% - Parallelism
+% - Memory bandwidth
+% - Specialized tensor cores
+% - When it's required
+
+\subsection{Hybrid Approaches}
+\label{subsec:hybrid-cpu-gpu}
+
+% TODO: CPU+GPU together
+% - Offloading layers
+% - llama.cpp layer splitting
+% - Trade-offs
+
+% =============================================================================
+\section{GPU Hardware Comparison}
+\label{sec:gpu-comparison}
+% =============================================================================
+
+% TODO: Comprehensive GPU comparison
+
+\subsection{NVIDIA Consumer GPUs}
+\label{subsec:nvidia-consumer}
+
+% TODO: RTX series comparison
+% - RTX 3060 12GB
+% - RTX 3090 24GB
+% - RTX 4060 8GB
+% - RTX 4070 Ti 16GB
+% - RTX 4080 16GB
+% - RTX 4090 24GB
+
+\subsection{NVIDIA Professional GPUs}
+\label{subsec:nvidia-professional}
+
+% TODO: Workstation and datacenter
+% - RTX A4000/A5000/A6000
+% - A100 40GB/80GB
+% - H100 80GB
+% - Comparison table
+
+\subsection{AMD GPUs}
+\label{subsec:amd-gpus}
+
+% TODO: AMD options
+% - ROCm support status
+% - RX 7900 XTX
+% - Instinct MI series
+% - Trade-offs vs NVIDIA
+
+\subsection{Apple Silicon}
+\label{subsec:apple-silicon}
+
+% TODO: M-series chips
+% - Unified memory advantage
+% - M1/M2/M3 performance
+% - M1/M2/M3 Pro/Max/Ultra
+% - When they make sense
+
+\subsection{Hardware Recommendation Matrix}
+\label{subsec:hardware-matrix}
+
+% TODO: Decision matrix table
+% | Model Size | Min VRAM | Recommended | Budget Option |
+% | 7B Q4 | 4GB | RTX 4060 8GB | M1 MacBook |
+% | 7B FP16 | 14GB | RTX 4090 24GB | RTX 3090 24GB |
+% | etc. |
+
+% =============================================================================
+\section{Owned vs Rented Infrastructure}
+\label{sec:owned-vs-rented}
+% =============================================================================
+
+% TODO: The big economic question
+
+\subsection{Buying Hardware}
+\label{subsec:buying-hardware}
+
+% TODO: Ownership economics
+% - Upfront CapEx
+% - Ongoing costs (power, cooling, maintenance)
+% - Depreciation
+% - Tax implications
+% - When it makes sense
+
+\subsection{Renting Cloud GPUs}
+\label{subsec:renting-gpus}
+
+% TODO: Rental options
+% - RunPod
+% - Vast.ai
+% - Lambda Labs
+% - Major cloud providers (AWS, GCP, Azure)
+% - Pricing comparison
+
+\subsection{Break-Even Analysis}
+\label{subsec:break-even}
+
+% TODO: When to buy vs rent
+% - Formula for break-even
+% - Worked examples
+% - Utilization factor
+% - Decision framework
+
+\begin{svgraybox}
+\textbf{Break-Even Formula:}
+
+\begin{equation}
+\text{Break-even (months)} = \frac{\text{Hardware Cost} + \text{Setup Costs}}{\text{Monthly Rental Cost} - \text{Monthly Operating Cost}}
+\end{equation}
+
+Where Monthly Operating Cost includes power, cooling, and amortized maintenance.
+\end{svgraybox}
+
+\subsection{Hybrid Strategies}
+\label{subsec:hybrid-strategies}
+
+% TODO: Best of both worlds
+% - Own base capacity
+% - Rent for burst
+% - Geographic distribution
+
+% =============================================================================
+\section{Power and Cooling Considerations}
+\label{sec:power-cooling}
+% =============================================================================
+
+% TODO: Practical infrastructure
+% - Power consumption by GPU
+% - Cooling requirements
+% - Home lab considerations
+% - Data center placement
+
+% =============================================================================
+\section{TPU as an Alternative}
+\label{sec:tpu-sidebar}
+% =============================================================================
+
+\begin{backgroundinformation}{Google Cloud TPUs}
+While this book primarily focuses on GPU-based inference, Google Cloud TPUs offer an alternative worth considering. TPUs can be 50--70\% cheaper than equivalent GPUs for sustained workloads, but require JAX-based models and are only available on Google Cloud Platform.
+
+If you're deploying on GCP with JAX models, see Appendix~\ref{ch:appendix-tpu} for complete coverage of TPU inference.
+\end{backgroundinformation}
+
+% =============================================================================
+\section{Summary}
+\label{sec:ch02-summary}
+% =============================================================================
+
+% TODO: Chapter summary
+
+\begin{important}{Key Takeaways}
+\begin{itemize}
+\item VRAM is the primary constraint for GPU inference
+\item Quantization dramatically reduces memory requirements (4x for INT4)
+\item CPU inference is viable for smaller models with enough RAM
+\item Hardware choice depends on model size, budget, and utilization
+\item Break-even between owned and rented depends on consistent usage
+\end{itemize}
+\end{important}
+
+% =============================================================================
+\section*{Problems}
+\addcontentsline{toc}{section}{Problems}
+% =============================================================================
+
+\begin{prob}
+\label{prob:ch02-vram-calc}
+\textbf{VRAM Calculation}\\
+Calculate the minimum VRAM required to run a 30B parameter model at FP16 precision with a context length of 4096 tokens. Then calculate the VRAM needed if quantized to INT4.
+\end{prob}
+
+\begin{prob}
+\label{prob:ch02-break-even}
+\textbf{Break-Even Analysis}\\
+You need to serve a 7B model 24/7. Calculate the break-even point (in months) between buying an RTX 4070 Ti (\$800) versus renting an equivalent GPU on RunPod (\$0.30/hour). Assume \$0.15/kWh electricity and 200W GPU power consumption.
+\end{prob}
+
+\begin{prob}
+\label{prob:ch02-hardware-selection}
+\textbf{Hardware Selection}\\
+A startup needs to serve 1000 requests/hour with a 7B model. They have a budget of \$5,000. Recommend a hardware configuration and justify your choice, considering both owned and rented options.
+\end{prob}
+
+\input{chapters/references02}

@@ -1,0 +1,300 @@
+%%%%%%%%%%%%%%%%%%%%% chapter07.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Chapter 7: Rate Limiting and Quotas
+%
+%%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Rate Limiting and Quotas}
+\label{ch:rate-limiting}
+
+\abstract*{Protecting your inference infrastructure requires thoughtful rate limiting. This chapter covers token bucket and sliding window algorithms, per-user and per-tier quotas, burst handling, and graceful degradation. We implement a flexible rate limiting system that integrates with authentication and provides clear feedback to users.}
+
+\abstract{Protecting your inference infrastructure requires thoughtful rate limiting. This chapter covers token bucket and sliding window algorithms, per-user and per-tier quotas, burst handling, and graceful degradation. We implement a flexible rate limiting system that integrates with authentication and provides clear feedback to users.}
+
+% =============================================================================
+\section{Why Rate Limiting?}
+\label{sec:why-rate-limiting}
+% =============================================================================
+
+% TODO: Motivation
+% - Protect infrastructure
+% - Fair resource sharing
+% - Cost management
+% - Prevent abuse
+% - SLA enforcement
+
+% =============================================================================
+\section{Rate Limiting Algorithms}
+\label{sec:rl-algorithms}
+% =============================================================================
+
+\subsection{Token Bucket}
+\label{subsec:token-bucket}
+
+% TODO: Token bucket explained
+% - How it works
+% - Allows bursting
+% - Implementation
+
+\subsection{Sliding Window}
+\label{subsec:sliding-window}
+
+% TODO: Sliding window
+% - Fixed vs sliding
+% - Memory considerations
+% - Implementation
+
+\subsection{Leaky Bucket}
+\label{subsec:leaky-bucket}
+
+% TODO: Leaky bucket
+% - Constant rate output
+% - When to use
+
+\subsection{Algorithm Comparison}
+\label{subsec:algorithm-comparison}
+
+% TODO: Comparison table
+
+% =============================================================================
+\section{Designing Rate Limit Policies}
+\label{sec:rl-policies}
+% =============================================================================
+
+% TODO: Policy design
+
+\subsection{Per-User Limits}
+\label{subsec:per-user-limits}
+
+% TODO: User-based limits
+% - Requests per minute
+% - Tokens per minute
+% - Concurrent requests
+
+\subsection{Per-Tier Limits}
+\label{subsec:per-tier-limits}
+
+% TODO: Tier-based differentiation
+% - Free tier
+% - Pro tier
+% - Enterprise tier
+
+\begin{programcode}{Rate Limit Configuration}
+\begin{lstlisting}[language=Go]
+// internal/ratelimit/config.go
+
+type RateLimitConfig struct {
+    Tiers map[string]TierLimits `yaml:"tiers"`
+}
+
+type TierLimits struct {
+    RequestsPerMinute    int `yaml:"requests_per_minute"`
+    TokensPerMinute      int `yaml:"tokens_per_minute"`
+    TokensPerDay         int `yaml:"tokens_per_day"`
+    MaxConcurrentReqs    int `yaml:"max_concurrent_requests"`
+    MaxTokensPerRequest  int `yaml:"max_tokens_per_request"`
+    BurstMultiplier      float64 `yaml:"burst_multiplier"`
+}
+
+var DefaultTierLimits = map[string]TierLimits{
+    "free": {
+        RequestsPerMinute:    10,
+        TokensPerMinute:      1000,
+        TokensPerDay:         10000,
+        MaxConcurrentReqs:    2,
+        MaxTokensPerRequest:  500,
+        BurstMultiplier:      1.5,
+    },
+    "pro": {
+        RequestsPerMinute:    60,
+        TokensPerMinute:      10000,
+        TokensPerDay:         500000,
+        MaxConcurrentReqs:    10,
+        MaxTokensPerRequest:  4000,
+        BurstMultiplier:      2.0,
+    },
+    "enterprise": {
+        RequestsPerMinute:    1000,
+        TokensPerMinute:      100000,
+        TokensPerDay:         10000000,
+        MaxConcurrentReqs:    100,
+        MaxTokensPerRequest:  32000,
+        BurstMultiplier:      3.0,
+    },
+}
+\end{lstlisting}
+\end{programcode}
+
+% =============================================================================
+\section{Implementing Rate Limiting}
+\label{sec:rl-implementation}
+% =============================================================================
+
+% TODO: Go implementation
+
+\begin{programcode}{Rate Limiter Interface}
+\begin{lstlisting}[language=Go]
+// internal/ratelimit/limiter.go
+
+package ratelimit
+
+import (
+    "context"
+    "time"
+)
+
+type Decision struct {
+    Allowed       bool
+    Remaining     int
+    ResetAt       time.Time
+    RetryAfter    time.Duration
+    LimitedBy     string // "rpm", "tpm", "concurrent", etc.
+}
+
+type Limiter interface {
+    // Allow checks if a request should be allowed
+    Allow(ctx context.Context, userID string, tier string) Decision
+
+    // AllowN checks if N tokens can be consumed
+    AllowN(ctx context.Context, userID string, tier string, tokens int) Decision
+
+    // Release releases a concurrent request slot
+    Release(ctx context.Context, userID string)
+}
+\end{lstlisting}
+\end{programcode}
+
+\subsection{Redis-based Implementation}
+\label{subsec:redis-implementation}
+
+% TODO: Distributed rate limiting
+% - Why Redis
+% - Lua scripts for atomicity
+% - Implementation
+
+\subsection{In-Memory Implementation}
+\label{subsec:inmemory-implementation}
+
+% TODO: Single-node option
+% - When appropriate
+% - sync.Map approach
+
+% =============================================================================
+\section{Rate Limiting Middleware}
+\label{sec:rl-middleware}
+% =============================================================================
+
+% TODO: HTTP middleware
+
+\begin{programcode}{Rate Limit Middleware}
+\begin{lstlisting}[language=Go]
+// internal/ratelimit/middleware.go
+
+func RateLimitMiddleware(limiter Limiter) func(http.Handler) http.Handler {
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            user := auth.GetUser(r.Context())
+            if user == nil {
+                http.Error(w, "unauthorized", http.StatusUnauthorized)
+                return
+            }
+
+            decision := limiter.Allow(r.Context(), user.ID, user.Tier)
+
+            // Set rate limit headers
+            w.Header().Set("X-RateLimit-Limit", fmt.Sprintf("%d", decision.Limit))
+            w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", decision.Remaining))
+            w.Header().Set("X-RateLimit-Reset", fmt.Sprintf("%d", decision.ResetAt.Unix()))
+
+            if !decision.Allowed {
+                w.Header().Set("Retry-After", fmt.Sprintf("%d", int(decision.RetryAfter.Seconds())))
+                http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
+                return
+            }
+
+            next.ServeHTTP(w, r)
+        })
+    }
+}
+\end{lstlisting}
+\end{programcode}
+
+% =============================================================================
+\section{Token-Based Rate Limiting}
+\label{sec:token-rate-limiting}
+% =============================================================================
+
+% TODO: Limiting by tokens, not just requests
+% - Why tokens matter for LLMs
+% - Pre-request estimation
+% - Post-request adjustment
+
+% =============================================================================
+\section{Handling Bursts}
+\label{sec:handling-bursts}
+% =============================================================================
+
+% TODO: Burst strategies
+% - Allow short bursts
+% - Queuing excess requests
+% - Graceful degradation
+
+% =============================================================================
+\section{Quota Management}
+\label{sec:quota-management}
+% =============================================================================
+
+% TODO: Daily/monthly quotas
+% - Tracking usage
+% - Alerting on approach
+% - Hard vs soft limits
+
+% =============================================================================
+\section{User Feedback}
+\label{sec:rl-user-feedback}
+% =============================================================================
+
+% TODO: Clear communication
+% - Rate limit headers
+% - Error messages
+% - Dashboard visibility
+
+% =============================================================================
+\section{Summary}
+\label{sec:ch07-summary}
+% =============================================================================
+
+\begin{important}{Key Takeaways}
+\begin{itemize}
+\item Rate limiting protects infrastructure and ensures fair usage
+\item Token bucket allows bursting while maintaining average rate
+\item Token-based limits matter more than request counts for LLMs
+\item Clear headers and error messages improve user experience
+\item Redis enables distributed rate limiting across multiple nodes
+\end{itemize}
+\end{important}
+
+% =============================================================================
+\section*{Problems}
+\addcontentsline{toc}{section}{Problems}
+% =============================================================================
+
+\begin{prob}
+\label{prob:ch07-token-bucket}
+\textbf{Token Bucket Implementation}\\
+Implement a token bucket rate limiter from scratch. Support configurable fill rate, bucket size, and burst capacity.
+\end{prob}
+
+\begin{prob}
+\label{prob:ch07-redis-limiter}
+\textbf{Redis Rate Limiter}\\
+Implement a distributed rate limiter using Redis. Use Lua scripts to ensure atomic check-and-decrement operations.
+\end{prob}
+
+\begin{prob}
+\label{prob:ch07-quota-tracker}
+\textbf{Quota Tracking System}\\
+Build a system that tracks daily and monthly token quotas per user. Include alerts when users approach their limits.
+\end{prob}
+
+\input{chapters/references07}

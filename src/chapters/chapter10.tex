@@ -1,0 +1,295 @@
+%%%%%%%%%%%%%%%%%%%%% chapter10.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Chapter 10: 30B Model Optimization
+%
+%%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{30B Model Optimization}
+\label{ch:30b-optimization}
+
+\abstract*{Moving from 7B to 30B models introduces new challenges. This chapter covers memory management at scale, KV cache optimization, batching strategies for throughput, vLLM tuning, and multi-model serving. We optimize our deployment to efficiently serve 30B models while maintaining acceptable latency.}
+
+\abstract{Moving from 7B to 30B models introduces new challenges. This chapter covers memory management at scale, KV cache optimization, batching strategies for throughput, vLLM tuning, and multi-model serving. We optimize our deployment to efficiently serve 30B models while maintaining acceptable latency.}
+
+% =============================================================================
+\section{The 30B Challenge}
+\label{sec:30b-challenge}
+% =============================================================================
+
+% TODO: What changes at 30B
+% - Memory requirements
+% - Throughput considerations
+% - Hardware requirements
+
+\subsection{Memory Requirements}
+\label{subsec:30b-memory}
+
+% TODO: Calculate memory needs
+% - Model weights
+% - KV cache
+% - Activations
+% - Overhead
+
+\begin{svgraybox}
+\textbf{30B Model Memory Requirements:}
+
+\begin{itemize}
+\item FP16 weights: $30B \times 2$ bytes = 60GB
+\item INT8 quantized: $30B \times 1$ byte = 30GB
+\item INT4 quantized: $30B \times 0.5$ bytes = 15GB
+\item KV cache (4K context): ~2-4GB additional
+\item Total with overhead (INT4): ~20-24GB
+\end{itemize}
+
+\textbf{Recommended Hardware:} RTX 4090 (24GB) or A100 40GB
+\end{svgraybox}
+
+% =============================================================================
+\section{KV Cache Management}
+\label{sec:kv-cache}
+% =============================================================================
+
+% TODO: Deep dive into KV cache
+
+\subsection{Understanding KV Cache}
+\label{subsec:kv-cache-understanding}
+
+% TODO: What is KV cache
+% - Keys and values from attention
+% - Why it grows with context
+% - Memory formula
+
+\subsection{KV Cache Optimization Techniques}
+\label{subsec:kv-optimization}
+
+% TODO: Optimization strategies
+% - Paged attention (vLLM)
+% - KV cache compression
+% - Sliding window attention
+
+\subsection{Context Length Trade-offs}
+\label{subsec:context-tradeoffs}
+
+% TODO: Balancing context and throughput
+% - Memory vs context
+% - Truncation strategies
+% - Multi-turn compression
+
+% =============================================================================
+\section{Batching Strategies}
+\label{sec:batching}
+% =============================================================================
+
+% TODO: Efficient batching
+
+\subsection{Static Batching}
+\label{subsec:static-batching}
+
+% TODO: Fixed batch sizes
+% - Simple to implement
+% - Inefficient for variable lengths
+
+\subsection{Dynamic Batching}
+\label{subsec:dynamic-batching}
+
+% TODO: Variable batch sizes
+% - Padding considerations
+% - Timeout-based batching
+
+\subsection{Continuous Batching}
+\label{subsec:continuous-batching}
+
+% TODO: vLLM's approach
+% - How it works
+% - Throughput benefits
+% - Implementation considerations
+
+% =============================================================================
+\section{vLLM Optimization}
+\label{sec:vllm-optimization}
+% =============================================================================
+
+% TODO: vLLM-specific tuning
+
+\subsection{Key Parameters}
+\label{subsec:vllm-parameters}
+
+\begin{programcode}{vLLM Configuration}
+\begin{lstlisting}[language=bash]
+# Optimized vLLM launch for 30B model
+python -m vllm.entrypoints.openai.api_server \
+    --model meta-llama/Llama-3.1-30B-Instruct \
+    --dtype float16 \
+    --tensor-parallel-size 1 \
+    --max-model-len 4096 \
+    --gpu-memory-utilization 0.90 \
+    --max-num-batched-tokens 4096 \
+    --max-num-seqs 128 \
+    --block-size 16 \
+    --swap-space 4 \
+    --enable-prefix-caching
+
+# Key parameters explained:
+# --gpu-memory-utilization: Use 90% of VRAM
+# --max-model-len: Maximum context length
+# --max-num-seqs: Maximum concurrent sequences
+# --block-size: KV cache block size
+# --swap-space: CPU swap space in GB
+# --enable-prefix-caching: Cache common prefixes
+\end{lstlisting}
+\end{programcode}
+
+\subsection{Memory Utilization}
+\label{subsec:memory-utilization}
+
+% TODO: Balancing memory
+% - Model weights
+% - KV cache allocation
+% - Emergency headroom
+
+\subsection{Prefix Caching}
+\label{subsec:prefix-caching}
+
+% TODO: System prompt caching
+% - What it caches
+% - Memory savings
+% - Configuration
+
+% =============================================================================
+\section{Multi-Model Serving}
+\label{sec:multi-model}
+% =============================================================================
+
+% TODO: Serving multiple models
+
+\subsection{Model Loading Strategies}
+\label{subsec:model-loading}
+
+% TODO: How to manage multiple models
+% - Always loaded
+% - On-demand loading
+% - LRU eviction
+
+\subsection{Memory Sharing}
+\label{subsec:memory-sharing}
+
+% TODO: Sharing between models
+% - Base model sharing (LoRA)
+% - Dynamic adapter loading
+
+% =============================================================================
+\section{Profiling and Debugging}
+\label{sec:profiling}
+% =============================================================================
+
+% TODO: Finding bottlenecks
+
+\subsection{GPU Profiling}
+\label{subsec:gpu-profiling}
+
+% TODO: Tools and techniques
+% - nvidia-smi
+% - Nsight Systems
+% - PyTorch profiler
+
+\subsection{Identifying Bottlenecks}
+\label{subsec:bottlenecks}
+
+% TODO: Common bottlenecks
+% - Memory bandwidth
+% - KV cache
+% - Tokenization
+% - Network I/O
+
+% =============================================================================
+\section{Benchmarking}
+\label{sec:benchmarking}
+% =============================================================================
+
+% TODO: Measuring performance
+
+\subsection{Key Metrics}
+\label{subsec:benchmark-metrics}
+
+% TODO: What to measure
+% - Throughput (tokens/sec)
+% - Latency (TTFT, TBT)
+% - Memory usage
+% - Cost per token
+
+\subsection{Benchmark Methodology}
+\label{subsec:benchmark-methodology}
+
+% TODO: How to benchmark fairly
+% - Consistent prompts
+% - Warm-up period
+% - Multiple runs
+% - Statistical significance
+
+% =============================================================================
+\section{Control Plane v0.2}
+\label{sec:cpv02}
+% =============================================================================
+
+% TODO: Summary of v0.2 features
+% - Authentication
+% - Rate limiting
+% - Caching
+% - Queuing
+% - Multi-model routing
+
+% =============================================================================
+\section{Summary}
+\label{sec:ch10-summary}
+% =============================================================================
+
+\begin{important}{Key Takeaways}
+\begin{itemize}
+\item 30B models require careful memory management
+\item KV cache grows with context length and batch size
+\item Continuous batching dramatically improves throughput
+\item vLLM's paged attention enables efficient memory use
+\item Profiling is essential for identifying bottlenecks
+\item Control Plane v0.2 is now production-ready
+\end{itemize}
+\end{important}
+
+\begin{svgraybox}
+\textbf{Part II Complete!}
+
+You now have a production-ready control plane (v0.2) with:
+\begin{itemize}
+\item Authentication and API key management
+\item Rate limiting with per-tier quotas
+\item Response caching (exact and semantic)
+\item Priority queue with load shedding
+\item Optimized 30B model serving
+\end{itemize}
+
+In Part III, we'll scale to multi-tenant with 70B models, adding tenant isolation, billing, and distributed inference.
+\end{svgraybox}
+
+% =============================================================================
+\section*{Problems}
+\addcontentsline{toc}{section}{Problems}
+% =============================================================================
+
+\begin{prob}
+\label{prob:ch10-memory-calc}
+\textbf{Memory Calculation}\\
+Calculate the total VRAM required to serve a 30B model with INT4 quantization, 8K context length, and batch size of 16. Include KV cache and overhead.
+\end{prob}
+
+\begin{prob}
+\label{prob:ch10-benchmark}
+\textbf{Performance Benchmark}\\
+Benchmark a 30B model with different batch sizes (1, 4, 16, 32). Graph throughput vs latency and find the optimal batch size for your use case.
+\end{prob}
+
+\begin{prob}
+\label{prob:ch10-multi-model}
+\textbf{Multi-Model Router}\\
+Implement a router that serves multiple models (7B, 13B, 30B) from a single endpoint. Include automatic model selection based on request complexity and user tier.
+\end{prob}
+
+\input{chapters/references10}

@@ -1,0 +1,131 @@
+%%%%%%%%%%%%%%%%%%%%% chapter12.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Chapter 12: Usage Tracking and Billing
+%
+%%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Usage Tracking and Billing}
+\label{ch:billing}
+
+\abstract*{Monetizing your inference platform requires accurate usage tracking and billing. This chapter covers metering token usage, designing a billing data model, integrating with payment providers (Stripe), and handling edge cases like failures and refunds. We build a usage tracking system that provides both real-time visibility and accurate billing.}
+
+\abstract{Monetizing your inference platform requires accurate usage tracking and billing. This chapter covers metering token usage, designing a billing data model, integrating with payment providers (Stripe), and handling edge cases like failures and refunds. We build a usage tracking system that provides both real-time visibility and accurate billing.}
+
+% =============================================================================
+\section{Usage Metering}
+\label{sec:metering}
+% =============================================================================
+
+% TODO: What to track
+% - Input tokens
+% - Output tokens
+% - Model used
+% - Request metadata
+
+% =============================================================================
+\section{Billing Models}
+\label{sec:billing-models}
+% =============================================================================
+
+\subsection{Per-Token Pricing}
+\label{subsec:per-token}
+
+% TODO: Pay for what you use
+
+\subsection{Subscription Tiers}
+\label{subsec:subscription}
+
+% TODO: Monthly plans
+
+\subsection{Hybrid Approach}
+\label{subsec:hybrid-billing}
+
+% TODO: Base + usage
+
+% =============================================================================
+\section{Usage Data Model}
+\label{sec:usage-model}
+% =============================================================================
+
+\begin{programcode}{Usage Event Model}
+\begin{lstlisting}[language=Go]
+// internal/billing/models.go
+
+type UsageEvent struct {
+    ID              string    `json:"id"`
+    TenantID        string    `json:"tenant_id"`
+    UserID          string    `json:"user_id"`
+    RequestID       string    `json:"request_id"`
+    Model           string    `json:"model"`
+    InputTokens     int       `json:"input_tokens"`
+    OutputTokens    int       `json:"output_tokens"`
+    CostCents       int64     `json:"cost_cents"`
+    Timestamp       time.Time `json:"timestamp"`
+}
+
+type UsageSummary struct {
+    TenantID        string    `json:"tenant_id"`
+    PeriodStart     time.Time `json:"period_start"`
+    PeriodEnd       time.Time `json:"period_end"`
+    TotalRequests   int64     `json:"total_requests"`
+    TotalInputToks  int64     `json:"total_input_tokens"`
+    TotalOutputToks int64     `json:"total_output_tokens"`
+    TotalCostCents  int64     `json:"total_cost_cents"`
+}
+\end{lstlisting}
+\end{programcode}
+
+% =============================================================================
+\section{Payment Integration}
+\label{sec:payment-integration}
+% =============================================================================
+
+% TODO: Stripe integration
+% - Customer management
+% - Subscription handling
+% - Usage-based billing
+% - Webhooks
+
+% =============================================================================
+\section{Invoice Generation}
+\label{sec:invoicing}
+% =============================================================================
+
+% TODO: Creating invoices
+% - Monthly aggregation
+% - Line items
+% - PDF generation
+
+% =============================================================================
+\section{Error Handling}
+\label{sec:billing-errors}
+% =============================================================================
+
+% TODO: Edge cases
+% - Failed requests (don't charge)
+% - Partial responses
+% - Refunds
+
+% =============================================================================
+\section{Summary}
+\label{sec:ch12-summary}
+% =============================================================================
+
+\begin{important}{Key Takeaways}
+\begin{itemize}
+\item Accurate usage metering is fundamental to billing
+\item Track both input and output tokens with model context
+\item Stripe provides robust billing infrastructure
+\item Handle edge cases gracefully (failures, refunds)
+\end{itemize}
+\end{important}
+
+\section*{Problems}
+\addcontentsline{toc}{section}{Problems}
+
+\begin{prob}
+\label{prob:ch12-usage-tracker}
+Implement a usage tracking service that records all inference requests and aggregates usage per tenant per billing period.
+\end{prob}
+
+\input{chapters/references12}

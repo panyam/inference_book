@@ -1,0 +1,118 @@
+%%%%%%%%%%%%%%%%%%%%% chapter13.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Chapter 13: Multi-GPU and Distributed Inference
+%
+%%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Multi-GPU and Distributed Inference}
+\label{ch:distributed}
+
+\abstract*{70B models don't fit on a single consumer GPU. This chapter covers tensor parallelism, pipeline parallelism, NVLink considerations, and orchestrating inference across multiple GPUs. We configure vLLM for multi-GPU inference and integrate distributed backends into our control plane.}
+
+\abstract{70B models don't fit on a single consumer GPU. This chapter covers tensor parallelism, pipeline parallelism, NVLink considerations, and orchestrating inference across multiple GPUs. We configure vLLM for multi-GPU inference and integrate distributed backends into our control plane.}
+
+% =============================================================================
+\section{Why Distributed Inference?}
+\label{sec:why-distributed}
+% =============================================================================
+
+% TODO: Motivation
+% - Model too large for single GPU
+% - Higher throughput
+% - Redundancy
+
+% =============================================================================
+\section{Parallelism Strategies}
+\label{sec:parallelism}
+% =============================================================================
+
+\subsection{Tensor Parallelism}
+\label{subsec:tensor-parallel}
+
+% TODO: Splitting layers across GPUs
+% - How it works
+% - Communication overhead
+% - NVLink importance
+
+\subsection{Pipeline Parallelism}
+\label{subsec:pipeline-parallel}
+
+% TODO: Sequential layer groups
+% - Less communication
+% - Bubble overhead
+
+\subsection{Data Parallelism}
+\label{subsec:data-parallel}
+
+% TODO: Separate replicas
+% - Simplest approach
+% - Good for throughput
+
+% =============================================================================
+\section{Hardware Topology}
+\label{sec:topology}
+% =============================================================================
+
+% TODO: Understanding GPU connections
+% - NVLink
+% - PCIe
+% - Network (multi-node)
+
+% =============================================================================
+\section{Configuring vLLM for Multi-GPU}
+\label{sec:vllm-multigpu}
+% =============================================================================
+
+\begin{programcode}{Multi-GPU vLLM Configuration}
+\begin{lstlisting}[language=bash]
+# 70B model across 2 GPUs
+python -m vllm.entrypoints.openai.api_server \
+    --model meta-llama/Llama-3.1-70B-Instruct \
+    --tensor-parallel-size 2 \
+    --dtype float16 \
+    --max-model-len 4096 \
+    --gpu-memory-utilization 0.90
+\end{lstlisting}
+\end{programcode}
+
+% =============================================================================
+\section{Multi-Node Deployment}
+\label{sec:multi-node}
+% =============================================================================
+
+% TODO: Across physical machines
+% - Ray for orchestration
+% - Network considerations
+
+% =============================================================================
+\section{Control Plane Integration}
+\label{sec:distributed-cp}
+% =============================================================================
+
+% TODO: Managing distributed backends
+% - Health across all GPUs
+% - Routing to available replicas
+
+% =============================================================================
+\section{Summary}
+\label{sec:ch13-summary}
+% =============================================================================
+
+\begin{important}{Key Takeaways}
+\begin{itemize}
+\item Tensor parallelism splits model layers across GPUs
+\item NVLink significantly improves multi-GPU performance
+\item vLLM handles parallelism transparently
+\item Control plane needs awareness of distributed backends
+\end{itemize}
+\end{important}
+
+\section*{Problems}
+\addcontentsline{toc}{section}{Problems}
+
+\begin{prob}
+\label{prob:ch13-benchmark}
+Benchmark a 70B model with tensor parallel sizes of 2 and 4. Measure throughput and latency differences.
+\end{prob}
+
+\input{chapters/references13}

@@ -1,0 +1,289 @@
+%%%%%%%%%%%%%%%%%%%%% chapter06.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Chapter 6: Authentication and API Keys
+%
+%%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Authentication and API Keys}
+\label{ch:authentication}
+
+\abstract*{A production inference service needs proper access control. This chapter covers API key management, JWT-based authentication for web clients, and multi-tenant considerations. We implement authentication middleware for the control plane, design a user and key management system, and discuss security best practices for AI inference APIs.}
+
+\abstract{A production inference service needs proper access control. This chapter covers API key management, JWT-based authentication for web clients, and multi-tenant considerations. We implement authentication middleware for the control plane, design a user and key management system, and discuss security best practices for AI inference APIs.}
+
+% =============================================================================
+\section{Why Authentication Matters}
+\label{sec:auth-matters}
+% =============================================================================
+
+% TODO: The case for authentication
+% - Cost control (GPU time isn't free)
+% - Audit trails
+% - Rate limiting per user
+% - Usage billing
+% - Access control
+
+% =============================================================================
+\section{Authentication Methods}
+\label{sec:auth-methods}
+% =============================================================================
+
+\subsection{API Keys}
+\label{subsec:api-keys}
+
+% TODO: API key design
+% - Generation (secure random)
+% - Prefix for identification (sk-, pk-)
+% - Hashing for storage
+% - Key rotation
+
+\subsection{JWT Tokens}
+\label{subsec:jwt-tokens}
+
+% TODO: JWT for web clients
+% - Structure
+% - Claims
+% - Signing
+% - Refresh tokens
+
+\subsection{OAuth2 Integration}
+\label{subsec:oauth2}
+
+% TODO: Enterprise integration
+% - When needed
+% - Implementation considerations
+
+% =============================================================================
+\section{Implementing Authentication Middleware}
+\label{sec:auth-middleware}
+% =============================================================================
+
+% TODO: Go implementation
+
+\begin{programcode}{Authentication Middleware}
+\begin{lstlisting}[language=Go]
+// internal/auth/middleware.go
+
+package auth
+
+import (
+    "context"
+    "net/http"
+    "strings"
+)
+
+type contextKey string
+
+const UserContextKey contextKey = "user"
+
+type User struct {
+    ID       string
+    Email    string
+    Tier     string // "free", "pro", "enterprise"
+    APIKeyID string
+}
+
+type Authenticator interface {
+    ValidateAPIKey(ctx context.Context, key string) (*User, error)
+    ValidateJWT(ctx context.Context, token string) (*User, error)
+}
+
+func AuthMiddleware(auth Authenticator) func(http.Handler) http.Handler {
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            // Check Authorization header
+            authHeader := r.Header.Get("Authorization")
+            if authHeader == "" {
+                http.Error(w, "missing authorization", http.StatusUnauthorized)
+                return
+            }
+
+            var user *User
+            var err error
+
+            if strings.HasPrefix(authHeader, "Bearer ") {
+                token := strings.TrimPrefix(authHeader, "Bearer ")
+
+                // Try API key first (sk- prefix)
+                if strings.HasPrefix(token, "sk-") {
+                    user, err = auth.ValidateAPIKey(r.Context(), token)
+                } else {
+                    // Assume JWT
+                    user, err = auth.ValidateJWT(r.Context(), token)
+                }
+            } else {
+                http.Error(w, "invalid authorization format", http.StatusUnauthorized)
+                return
+            }
+
+            if err != nil {
+                http.Error(w, "invalid credentials", http.StatusUnauthorized)
+                return
+            }
+
+            // Add user to context
+            ctx := context.WithValue(r.Context(), UserContextKey, user)
+            next.ServeHTTP(w, r.WithContext(ctx))
+        })
+    }
+}
+
+// GetUser retrieves user from context
+func GetUser(ctx context.Context) *User {
+    user, _ := ctx.Value(UserContextKey).(*User)
+    return user
+}
+\end{lstlisting}
+\end{programcode}
+
+% =============================================================================
+\section{API Key Management}
+\label{sec:api-key-management}
+% =============================================================================
+
+% TODO: Key lifecycle
+
+\subsection{Key Generation}
+\label{subsec:key-generation}
+
+% TODO: Secure generation
+% - Cryptographically secure random
+% - Prefix for type identification
+% - Length considerations
+
+\subsection{Key Storage}
+\label{subsec:key-storage}
+
+% TODO: Secure storage
+% - Never store plaintext
+% - Hash with bcrypt/argon2
+% - Prefix for lookup
+
+\subsection{Key Rotation}
+\label{subsec:key-rotation}
+
+% TODO: Rotation strategies
+% - Graceful rotation
+% - Overlap period
+% - Notification
+
+\subsection{Key Revocation}
+\label{subsec:key-revocation}
+
+% TODO: Revocation handling
+% - Immediate vs graceful
+% - Audit logging
+
+% =============================================================================
+\section{User and Organization Model}
+\label{sec:user-model}
+% =============================================================================
+
+% TODO: Data model design
+
+\begin{programcode}{User Data Model}
+\begin{lstlisting}[language=Go]
+// internal/auth/models.go
+
+type Organization struct {
+    ID        string    `json:"id"`
+    Name      string    `json:"name"`
+    Tier      string    `json:"tier"`
+    CreatedAt time.Time `json:"created_at"`
+}
+
+type User struct {
+    ID             string    `json:"id"`
+    Email          string    `json:"email"`
+    OrganizationID string    `json:"organization_id"`
+    Role           string    `json:"role"` // admin, member
+    CreatedAt      time.Time `json:"created_at"`
+}
+
+type APIKey struct {
+    ID             string    `json:"id"`
+    Prefix         string    `json:"prefix"` // First 8 chars for lookup
+    HashedKey      string    `json:"-"`      // Never expose
+    Name           string    `json:"name"`
+    UserID         string    `json:"user_id"`
+    OrganizationID string    `json:"organization_id"`
+    Scopes         []string  `json:"scopes"`
+    ExpiresAt      *time.Time `json:"expires_at,omitempty"`
+    LastUsedAt     *time.Time `json:"last_used_at,omitempty"`
+    CreatedAt      time.Time `json:"created_at"`
+    RevokedAt      *time.Time `json:"revoked_at,omitempty"`
+}
+\end{lstlisting}
+\end{programcode}
+
+% =============================================================================
+\section{Security Best Practices}
+\label{sec:security-best-practices}
+% =============================================================================
+
+% TODO: Security considerations
+% - HTTPS only
+% - Rate limiting on auth endpoints
+% - Audit logging
+% - Key hygiene
+% - Principle of least privilege
+
+\begin{warning}{Security Considerations}
+\begin{itemize}
+\item Always use HTTPS in production
+\item Rate limit authentication endpoints aggressively
+\item Log all authentication events
+\item Set reasonable key expiration policies
+\item Implement proper key scoping
+\end{itemize}
+\end{warning}
+
+% =============================================================================
+\section{Integration with Control Plane}
+\label{sec:auth-integration}
+% =============================================================================
+
+% TODO: Wiring it together
+% - Adding middleware to router
+% - User context in handlers
+% - Per-user metrics
+
+% =============================================================================
+\section{Summary}
+\label{sec:ch06-summary}
+% =============================================================================
+
+\begin{important}{Key Takeaways}
+\begin{itemize}
+\item API keys are the standard for programmatic access
+\item JWTs work well for web-based clients
+\item Always hash keys before storage
+\item Key rotation should be graceful with overlap periods
+\item Audit logging is essential for security and debugging
+\end{itemize}
+\end{important}
+
+% =============================================================================
+\section*{Problems}
+\addcontentsline{toc}{section}{Problems}
+% =============================================================================
+
+\begin{prob}
+\label{prob:ch06-key-generator}
+\textbf{API Key Generator}\\
+Implement a secure API key generator that produces keys with format \texttt{sk-live-<32 random chars>}. Include functions for hashing and validating keys.
+\end{prob}
+
+\begin{prob}
+\label{prob:ch06-jwt-service}
+\textbf{JWT Authentication Service}\\
+Create a JWT service that issues tokens with user claims, validates signatures, and handles refresh tokens. Include proper expiration handling.
+\end{prob}
+
+\begin{prob}
+\label{prob:ch06-audit-log}
+\textbf{Authentication Audit Log}\\
+Design and implement an audit log system that records all authentication events including successful logins, failed attempts, key creation, and revocation.
+\end{prob}
+
+\input{chapters/references06}

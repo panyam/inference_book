@@ -1,0 +1,64 @@
+%%%%%%%%%%%%%%%%%%%%%%glossary.tex%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Glossary
+%
+%%%%%%%%%%%%%%%%%%%%%%%% Springer %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\Extrachap{Glossary}
+
+\runinhead{Attention} The mechanism in transformer models that allows each position to attend to all other positions when computing representations.
+
+\runinhead{Autoregressive Generation} A method where each new token is generated based on all previously generated tokens, one at a time.
+
+\runinhead{Batch Size} The number of requests processed together in a single forward pass through the model.
+
+\runinhead{BFloat16 (BF16)} A 16-bit floating point format with the same exponent range as FP32 but reduced mantissa precision. Common for inference.
+
+\runinhead{Continuous Batching} A technique where new requests can be added to an ongoing batch without waiting for all current requests to complete.
+
+\runinhead{Control Plane} The component that manages and orchestrates inference requests, handling routing, authentication, rate limiting, and backend management.
+
+\runinhead{Fine-tuning} Adapting a pre-trained model to a specific task or domain by training on additional data.
+
+\runinhead{FP16} 16-bit floating point format commonly used for inference to reduce memory usage.
+
+\runinhead{GGUF} GPT-Generated Unified Format, a file format for storing quantized models optimized for inference with llama.cpp.
+
+\runinhead{Inference} The process of using a trained model to generate predictions or outputs from inputs.
+
+\runinhead{KV Cache} Key-Value cache that stores intermediate attention computations to avoid redundant calculation during autoregressive generation.
+
+\runinhead{Large Language Model (LLM)} A neural network trained on vast amounts of text data, capable of understanding and generating human-like text.
+
+\runinhead{Latency} The time between sending a request and receiving a response. Often measured as time-to-first-token (TTFT) for streaming.
+
+\runinhead{LoRA} Low-Rank Adaptation, a parameter-efficient fine-tuning technique that trains small adapter layers instead of the full model.
+
+\runinhead{Model Parallelism} Distributing different parts of a model across multiple GPUs to handle models larger than a single GPU's memory.
+
+\runinhead{Multi-tenancy} Architecture where multiple customers (tenants) share the same infrastructure while maintaining isolation.
+
+\runinhead{NVLink} NVIDIA's high-bandwidth interconnect for communication between GPUs, essential for tensor parallelism.
+
+\runinhead{Paged Attention} vLLM's technique for efficient KV cache memory management using paging similar to operating system virtual memory.
+
+\runinhead{Pipeline Parallelism} Splitting model layers into stages processed by different GPUs in sequence.
+
+\runinhead{Quantization} Reducing the precision of model weights (e.g., from 16-bit to 4-bit) to decrease memory usage and increase speed.
+
+\runinhead{Rate Limiting} Controlling the number of requests a user can make within a time period to protect resources.
+
+\runinhead{Streaming} Sending generated tokens to the client as they're produced rather than waiting for the complete response.
+
+\runinhead{Tensor Parallelism} Splitting individual layers across multiple GPUs, requiring high-bandwidth interconnects like NVLink.
+
+\runinhead{Throughput} The number of tokens generated per unit time across all concurrent requests.
+
+\runinhead{Time-to-First-Token (TTFT)} The latency from sending a request until the first token is received.
+
+\runinhead{Tokens} Subword units that models process. A token is typically 3-4 characters of English text.
+
+\runinhead{Transformer} The neural network architecture underlying modern LLMs, using attention mechanisms for processing sequences.
+
+\runinhead{VRAM} Video RAM, the GPU memory used to store model weights, KV cache, and intermediate computations.
+
+\runinhead{WebGPU} A modern web standard for GPU-accelerated computation in browsers, enabling client-side inference.

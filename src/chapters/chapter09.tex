@@ -1,0 +1,315 @@
+%%%%%%%%%%%%%%%%%%%%% chapter09.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Chapter 9: Request Queue and Priority Management
+%
+%%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Request Queue and Priority Management}
+\label{ch:queue}
+
+\abstract*{When demand exceeds capacity, you need a queue. This chapter covers request queue design, priority levels, fairness algorithms, timeout handling, and queue-aware load shedding. We implement a priority queue system that ensures important requests get processed while preventing queue explosion during traffic spikes.}
+
+\abstract{When demand exceeds capacity, you need a queue. This chapter covers request queue design, priority levels, fairness algorithms, timeout handling, and queue-aware load shedding. We implement a priority queue system that ensures important requests get processed while preventing queue explosion during traffic spikes.}
+
+% =============================================================================
+\section{Why Queue Requests?}
+\label{sec:why-queue}
+% =============================================================================
+
+% TODO: Motivation
+% - Traffic spikes
+% - GPU utilization optimization
+% - Fair resource allocation
+% - Graceful overload handling
+
+% =============================================================================
+\section{Queue Architecture}
+\label{sec:queue-architecture}
+% =============================================================================
+
+% TODO: Design considerations
+
+\subsection{In-Memory vs Distributed}
+\label{subsec:queue-types}
+
+% TODO: Trade-offs
+% - In-memory: simple, fast, single node
+% - Distributed: Redis, RabbitMQ, etc.
+
+\subsection{Priority Levels}
+\label{subsec:priority-levels}
+
+% TODO: Defining priorities
+% - Enterprise (highest)
+% - Pro
+% - Free (lowest)
+% - System/internal
+
+\begin{programcode}{Priority Queue Interface}
+\begin{lstlisting}[language=Go]
+// internal/queue/queue.go
+
+package queue
+
+import (
+    "context"
+    "time"
+)
+
+type Priority int
+
+const (
+    PriorityLow Priority = iota
+    PriorityNormal
+    PriorityHigh
+    PriorityCritical
+)
+
+type QueuedRequest struct {
+    ID          string
+    UserID      string
+    Priority    Priority
+    Request     backend.GenerateRequest
+    EnqueuedAt  time.Time
+    Deadline    time.Time
+    ResultChan  chan QueueResult
+}
+
+type QueueResult struct {
+    Response backend.GenerateResponse
+    Error    error
+    WaitTime time.Duration
+}
+
+type RequestQueue interface {
+    // Enqueue adds a request to the queue
+    Enqueue(ctx context.Context, req QueuedRequest) error
+
+    // Dequeue gets the next request to process
+    Dequeue(ctx context.Context) (*QueuedRequest, error)
+
+    // Size returns current queue length by priority
+    Size(ctx context.Context) map[Priority]int
+
+    // Stats returns queue statistics
+    Stats(ctx context.Context) QueueStats
+}
+
+type QueueStats struct {
+    TotalEnqueued   int64
+    TotalProcessed  int64
+    TotalTimeout    int64
+    AverageWaitTime time.Duration
+    CurrentDepth    int
+}
+\end{lstlisting}
+\end{programcode}
+
+% =============================================================================
+\section{Implementing Priority Queue}
+\label{sec:priority-queue-impl}
+% =============================================================================
+
+% TODO: Implementation
+
+\subsection{Heap-Based Priority Queue}
+\label{subsec:heap-queue}
+
+% TODO: Using container/heap
+% - Standard library approach
+% - Efficient O(log n) operations
+
+\subsection{Multiple Queue Approach}
+\label{subsec:multi-queue}
+
+% TODO: Separate queues per priority
+% - Simple round-robin
+% - Weighted fair queueing
+
+% =============================================================================
+\section{Fairness Algorithms}
+\label{sec:fairness}
+% =============================================================================
+
+% TODO: Preventing starvation
+
+\subsection{Weighted Fair Queueing}
+\label{subsec:wfq}
+
+% TODO: WFQ explained
+% - Weights per priority
+% - Preventing low-priority starvation
+
+\subsection{Deficit Round Robin}
+\label{subsec:drr}
+
+% TODO: DRR for simplicity
+% - How it works
+% - Implementation
+
+% =============================================================================
+\section{Timeout Handling}
+\label{sec:timeout-handling}
+% =============================================================================
+
+% TODO: Managing deadlines
+
+\subsection{Queue Timeout}
+\label{subsec:queue-timeout}
+
+% TODO: Max time in queue
+% - Per-priority timeouts
+% - Removing stale requests
+
+\subsection{Processing Timeout}
+\label{subsec:processing-timeout}
+
+% TODO: Max inference time
+% - Context cancellation
+% - Resource cleanup
+
+% =============================================================================
+\section{Load Shedding}
+\label{sec:load-shedding}
+% =============================================================================
+
+% TODO: When queue gets too long
+
+\subsection{Queue Limits}
+\label{subsec:queue-limits}
+
+% TODO: Max queue depth
+% - Per-priority limits
+% - System-wide limits
+
+\subsection{Graceful Rejection}
+\label{subsec:graceful-rejection}
+
+% TODO: How to reject
+% - 503 Service Unavailable
+% - Retry-After header
+% - Queue position estimation
+
+\begin{programcode}{Load Shedding Configuration}
+\begin{lstlisting}[language=Go]
+// internal/queue/config.go
+
+type QueueConfig struct {
+    // Maximum queue depth per priority
+    MaxDepth map[Priority]int `yaml:"max_depth"`
+
+    // Maximum wait time in queue
+    MaxWaitTime map[Priority]time.Duration `yaml:"max_wait_time"`
+
+    // Processing timeout
+    ProcessingTimeout time.Duration `yaml:"processing_timeout"`
+
+    // Weights for fair queueing (higher = more service)
+    Weights map[Priority]int `yaml:"weights"`
+}
+
+var DefaultQueueConfig = QueueConfig{
+    MaxDepth: map[Priority]int{
+        PriorityLow:      100,
+        PriorityNormal:   500,
+        PriorityHigh:     1000,
+        PriorityCritical: 5000,
+    },
+    MaxWaitTime: map[Priority]time.Duration{
+        PriorityLow:      30 * time.Second,
+        PriorityNormal:   60 * time.Second,
+        PriorityHigh:     120 * time.Second,
+        PriorityCritical: 300 * time.Second,
+    },
+    ProcessingTimeout: 5 * time.Minute,
+    Weights: map[Priority]int{
+        PriorityLow:      1,
+        PriorityNormal:   3,
+        PriorityHigh:     10,
+        PriorityCritical: 50,
+    },
+}
+\end{lstlisting}
+\end{programcode}
+
+% =============================================================================
+\section{Worker Pool}
+\label{sec:worker-pool}
+% =============================================================================
+
+% TODO: Processing requests from queue
+
+\subsection{Worker Design}
+\label{subsec:worker-design}
+
+% TODO: Worker goroutines
+% - Pool size configuration
+% - Graceful shutdown
+
+\subsection{Scaling Workers}
+\label{subsec:scaling-workers}
+
+% TODO: Dynamic scaling
+% - Based on queue depth
+% - Based on GPU utilization
+
+% =============================================================================
+\section{Metrics and Visibility}
+\label{sec:queue-metrics}
+% =============================================================================
+
+% TODO: What to track
+% - Queue depth
+% - Wait time percentiles
+% - Rejection rate
+% - Timeout rate
+
+% =============================================================================
+\section{Integration with Control Plane}
+\label{sec:queue-integration}
+% =============================================================================
+
+% TODO: Wiring it together
+% - Synchronous vs async API
+% - Webhook callbacks
+% - Polling endpoints
+
+% =============================================================================
+\section{Summary}
+\label{sec:ch09-summary}
+% =============================================================================
+
+\begin{important}{Key Takeaways}
+\begin{itemize}
+\item Queues enable graceful handling of traffic spikes
+\item Priority levels ensure important requests get served first
+\item Fairness algorithms prevent starvation of lower priorities
+\item Load shedding protects the system from overload
+\item Clear visibility into queue state is essential
+\end{itemize}
+\end{important}
+
+% =============================================================================
+\section*{Problems}
+\addcontentsline{toc}{section}{Problems}
+% =============================================================================
+
+\begin{prob}
+\label{prob:ch09-priority-queue}
+\textbf{Priority Queue Implementation}\\
+Implement a priority queue using Go's container/heap package. Support multiple priority levels with configurable weights.
+\end{prob}
+
+\begin{prob}
+\label{prob:ch09-worker-pool}
+\textbf{Worker Pool}\\
+Build a worker pool that processes requests from the priority queue. Include graceful shutdown and dynamic scaling based on queue depth.
+\end{prob}
+
+\begin{prob}
+\label{prob:ch09-load-test}
+\textbf{Load Testing}\\
+Create a load testing tool that generates traffic at various rates. Measure queue behavior under normal load, overload, and spike scenarios.
+\end{prob}
+
+\input{chapters/references09}

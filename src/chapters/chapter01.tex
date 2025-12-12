@@ -1,0 +1,239 @@
+%%%%%%%%%%%%%%%%%%%%% chapter01.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Chapter 1: Introduction to Self-Hosted Inference
+%
+%%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Introduction to Self-Hosted Inference}
+\label{ch:introduction}
+
+\abstract*{This chapter introduces the concept of self-hosted AI inference, explaining why organizations and individuals choose to run their own models rather than relying on cloud APIs. We cover the fundamental differences between training and inference, the economic and strategic considerations for self-hosting, and provide a roadmap for what you'll build throughout this book. By the end of this chapter, you'll run your first local model and make your first inference request.}
+
+\abstract{This chapter introduces the concept of self-hosted AI inference, explaining why organizations and individuals choose to run their own models rather than relying on cloud APIs. We cover the fundamental differences between training and inference, the economic and strategic considerations for self-hosting, and provide a roadmap for what you'll build throughout this book. By the end of this chapter, you'll run your first local model and make your first inference request.}
+
+% =============================================================================
+\section{The Rise of Self-Hosted AI}
+\label{sec:rise-of-self-hosted}
+% =============================================================================
+
+% TODO: Write introduction about the current state of AI
+% - Explosion of capable open models (Llama, Mistral, Qwen, etc.)
+% - Gap between API-based AI and self-hosted
+% - The democratization of AI infrastructure
+
+% =============================================================================
+\section{Training vs. Inference: Understanding the Difference}
+\label{sec:training-vs-inference}
+% =============================================================================
+
+% TODO: Explain the fundamental difference
+% - Training: Learning from data, compute-intensive, rare
+% - Inference: Using trained model, lighter, continuous
+% - Resource comparison table
+% - Why inference is accessible to individuals and small teams
+
+\subsection{What Happens During Training}
+\label{subsec:training}
+
+% TODO: High-level explanation of training
+% - Forward pass, backward pass, gradient descent
+% - Why it needs so much compute
+% - Data requirements
+
+\subsection{What Happens During Inference}
+\label{subsec:inference}
+
+% TODO: Explain inference mechanics
+% - Forward pass only
+% - Autoregressive generation for LLMs
+% - Memory requirements vs compute requirements
+
+\subsection{Resource Comparison}
+\label{subsec:resource-comparison}
+
+% TODO: Create comparison table
+% | Aspect | Training | Inference |
+% | Hardware | 8+ A100s | 1 consumer GPU |
+% | Time | Days/Weeks | Milliseconds/Seconds |
+% | Data | TB of text | Single prompt |
+% | Cost | $100K+ | $0.001/request |
+
+% =============================================================================
+\section{Why Self-Host?}
+\label{sec:why-self-host}
+% =============================================================================
+
+% TODO: Cover the key motivations
+
+\subsection{Cost Control}
+\label{subsec:cost-control}
+
+% TODO: Economic analysis
+% - API pricing breakdown
+% - Self-hosted cost modeling
+% - Break-even calculations
+% - When each makes sense
+
+\subsection{Privacy and Data Sovereignty}
+\label{subsec:privacy}
+
+% TODO: Privacy considerations
+% - What data leaves your control with APIs
+% - Regulatory requirements (GDPR, HIPAA, etc.)
+% - Industries where this matters most
+% - Air-gapped deployments
+
+\subsection{Latency and Performance}
+\label{subsec:latency}
+
+% TODO: Performance benefits
+% - Network round-trip elimination
+% - Consistent response times
+% - Geographic considerations
+
+\subsection{Customization and Control}
+\label{subsec:customization}
+
+% TODO: What you can do when you own the stack
+% - Fine-tuning
+% - Custom inference parameters
+% - No usage limits or quotas
+% - Model selection freedom
+
+\subsection{When NOT to Self-Host}
+\label{subsec:when-not-to-self-host}
+
+% TODO: Honest assessment of trade-offs
+% - Small scale / experimentation
+% - Rapidly changing requirements
+% - Need for cutting-edge models immediately
+% - Lack of infrastructure expertise
+
+% =============================================================================
+\section{What You'll Build in This Book}
+\label{sec:what-youll-build}
+% =============================================================================
+
+% TODO: Roadmap of the book
+% - Progressive control plane (v0.1 -> v1.0)
+% - From 7B to 400B
+% - The CodeLab capstone project
+
+\subsection{The Progressive Journey}
+\label{subsec:progressive-journey}
+
+% TODO: Explain the 4-part structure
+% - Part I: 7B foundations
+% - Part II: 30B production
+% - Part III: 70B multi-tenant
+% - Part IV: 400B inference lab
+
+\subsection{Control Plane Evolution}
+\label{subsec:control-plane-evolution}
+
+% TODO: Preview the control plane architecture
+% - Why Go
+% - Interface-driven design
+% - Feature flags for progressive capabilities
+
+% =============================================================================
+\section{Hands-On: Your First Local Inference}
+\label{sec:hands-on-first-inference}
+% =============================================================================
+
+% TODO: Step-by-step guide
+
+\subsection{Installing Ollama}
+\label{subsec:installing-ollama}
+
+% TODO: Installation instructions
+% - macOS: brew install ollama
+% - Linux: curl script
+% - Windows: installer
+% - Verify installation
+
+\subsection{Running Your First Model}
+\label{subsec:first-model}
+
+% TODO: Running a model
+% - ollama pull llama3.2:7b
+% - ollama run llama3.2:7b
+% - Understanding what's happening
+
+\subsection{Making API Requests}
+\label{subsec:api-requests}
+
+% TODO: API usage
+% - curl examples
+% - Python example
+% - Response structure
+% - Streaming vs non-streaming
+
+\begin{programcode}{First Inference Request}
+\begin{lstlisting}[language=bash]
+# Pull a 7B model
+ollama pull llama3.2:7b
+
+# Make an inference request
+curl http://localhost:11434/api/generate \
+  -d '{
+    "model": "llama3.2:7b",
+    "prompt": "Explain what AI inference is in one paragraph.",
+    "stream": false
+  }'
+\end{lstlisting}
+\end{programcode}
+
+% =============================================================================
+\section{Understanding the Response}
+\label{sec:understanding-response}
+% =============================================================================
+
+% TODO: Explain response structure
+% - Tokens and tokenization
+% - Generation parameters
+% - Metrics (tokens/second, timing)
+
+% =============================================================================
+\section{Summary}
+\label{sec:ch01-summary}
+% =============================================================================
+
+% TODO: Chapter summary
+% - Key concepts covered
+% - What you've accomplished
+% - Preview of next chapter
+
+\begin{important}{Key Takeaways}
+\begin{itemize}
+\item Inference is fundamentally different from training and accessible with consumer hardware
+\item Self-hosting offers cost control, privacy, and customization benefits
+\item Open models like Llama, Mistral, and Qwen make self-hosting viable
+\item You've run your first local inference with Ollama
+\end{itemize}
+\end{important}
+
+% =============================================================================
+\section*{Problems}
+\addcontentsline{toc}{section}{Problems}
+% =============================================================================
+
+\begin{prob}
+\label{prob:ch01-cost-analysis}
+\textbf{Cost Comparison}\\
+Calculate the monthly cost of running 100,000 inference requests through OpenAI's GPT-4 API versus self-hosting a 7B model on an RTX 4060. Assume average request length of 500 tokens input and 200 tokens output.
+\end{prob}
+
+\begin{prob}
+\label{prob:ch01-latency-measurement}
+\textbf{Latency Measurement}\\
+Using Ollama, measure the time-to-first-token (TTFT) and tokens-per-second for three different prompts: (a) a simple question, (b) a code generation request, and (c) a creative writing prompt. What patterns do you observe?
+\end{prob}
+
+\begin{prob}
+\label{prob:ch01-streaming}
+\textbf{Streaming vs Non-Streaming}\\
+Implement a simple Python script that makes both streaming and non-streaming requests to Ollama. Measure the perceived latency (time until user sees first output) for each approach.
+\end{prob}
+
+\input{chapters/references01}

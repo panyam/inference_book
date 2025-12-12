@@ -1,0 +1,81 @@
+%%%%%%%%%%%%%%%%%%%%%%% preface.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Preface - Author's introduction to the book
+%
+%%%%%%%%%%%%%%%%%%%%%%%% Springer %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\preface
+
+% TODO: Write the preface covering:
+
+\section*{Why This Book?}
+
+% The explosion of large language models has created unprecedented demand for
+% inference infrastructure. While cloud APIs offer convenience, they come with
+% significant trade-offs: ongoing costs, privacy concerns, latency limitations,
+% and vendor lock-in.
+
+% This book takes a different approach. Rather than treating models as black boxes
+% accessed through APIs, we'll build the infrastructure to host them ourselves---
+% from a single 7B model on consumer hardware to a commercial-grade 400B inference
+% lab capable of serving thousands of users.
+
+\section*{Who This Book Is For}
+
+% This book is written for software engineers, infrastructure engineers, and
+% technical leaders who want to:
+% - Understand how AI inference actually works
+% - Deploy models on their own infrastructure
+% - Build production-grade inference systems
+% - Make informed decisions about hardware investments
+% - Create multi-tenant AI platforms
+
+% You should have experience with:
+% - Programming (we'll use Go for the control plane, Python for ML tooling)
+% - REST APIs and distributed systems
+% - Basic containerization (Docker)
+% - Command-line tools
+
+% You don't need prior ML or AI experience---that's what this book will teach you.
+
+\section*{What You'll Build}
+
+% Across four parts and 18 chapters, you'll build a single Go-based control plane
+% that evolves from serving a 7B model on your laptop to orchestrating a 400B
+% inference lab. Nothing gets thrown away---each chapter adds capabilities to what
+% you've already built.
+
+% By the end, you'll have:
+% - A production-ready inference control plane
+% - Multi-tenant authentication and rate limiting
+% - Intelligent request routing and load balancing
+% - Cost tracking and billing infrastructure
+% - Distributed inference across multiple GPUs
+% - The knowledge to make informed infrastructure decisions
+
+\section*{How to Read This Book}
+
+% This book is designed to be read sequentially. Each part builds on the previous:
+% - Part I (Foundations) can stand alone for learning the basics
+% - Part II (Production) requires Part I
+% - Part III (Multi-Tenant) requires Parts I-II
+% - Part IV (Inference Lab) synthesizes everything
+
+% However, experienced readers may jump to specific chapters for reference.
+
+\section*{Code and Resources}
+
+% All code from this book is available at:
+% https://github.com/[repository-url]
+
+% The repository includes:
+% - Complete control plane source code
+% - Example configurations
+% - Deployment templates
+% - Cost calculators and spreadsheets
+
+\vspace{\baselineskip}
+\begin{flushright}\noindent
+Location,\hfill {\it Author Name}\\
+Month Year\\
+\end{flushright}

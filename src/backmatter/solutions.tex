@@ -1,0 +1,100 @@
+%%%%%%%%%%%%%%%%%%%%%%solutions.tex%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Solutions to Problems
+%
+%%%%%%%%%%%%%%%%%%%%%%%% Springer %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\Extrachap{Solutions}
+
+% =============================================================================
+\section*{Solutions for Chapter~\ref{ch:introduction}}
+% =============================================================================
+
+\begin{sol}{prob:ch01-cost-analysis}
+\textbf{Cost Comparison}
+
+OpenAI GPT-4 API (as of 2024):
+\begin{itemize}
+\item Input: \$0.03 per 1K tokens
+\item Output: \$0.06 per 1K tokens
+\item Monthly cost: 100,000 requests $\times$ (500 $\times$ \$0.03/1K + 200 $\times$ \$0.06/1K) = \$2,700/month
+\end{itemize}
+
+Self-hosted 7B model on RTX 4060:
+\begin{itemize}
+\item Hardware: \$300 (amortized over 3 years = \$8.33/month)
+\item Power: 200W $\times$ 720 hours $\times$ \$0.15/kWh = \$21.60/month
+\item Total: ~\$30/month
+\end{itemize}
+
+\textbf{Conclusion:} Self-hosting is 90x cheaper at this volume, but requires technical expertise and maintenance.
+\end{sol}
+
+\begin{sol}{prob:ch01-latency-measurement}
+\textbf{Latency Measurement}
+
+Typical results on RTX 4060 with 7B Q4 model:
+\begin{itemize}
+\item Simple question: TTFT ~200ms, 25-30 tok/s
+\item Code generation: TTFT ~250ms, 20-25 tok/s
+\item Creative writing: TTFT ~200ms, 25-30 tok/s
+\end{itemize}
+
+The TTFT is relatively consistent because it's dominated by the prompt processing. Throughput varies slightly based on the patterns in the generated content.
+\end{sol}
+
+% =============================================================================
+\section*{Solutions for Chapter~\ref{ch:hardware}}
+% =============================================================================
+
+\begin{sol}{prob:ch02-vram-calc}
+\textbf{VRAM Calculation}
+
+30B model at FP16:
+\begin{itemize}
+\item Weights: 30B $\times$ 2 bytes = 60GB
+\item KV cache (4096 context): ~3GB
+\item Overhead (15\%): ~9GB
+\item Total: ~72GB (requires 2x A100 40GB or 1x A100 80GB)
+\end{itemize}
+
+30B model at INT4:
+\begin{itemize}
+\item Weights: 30B $\times$ 0.5 bytes = 15GB
+\item KV cache: ~3GB
+\item Overhead: ~3GB
+\item Total: ~21GB (fits in RTX 4090 24GB)
+\end{itemize}
+\end{sol}
+
+% =============================================================================
+\section*{Solutions for Chapter~\ref{ch:control-plane-v01}}
+% =============================================================================
+
+\begin{sol}{prob:ch05-vllm-backend}
+\textbf{vLLM Backend Implementation}
+
+See the companion repository for the complete implementation. Key differences from Ollama backend:
+\begin{itemize}
+\item Uses OpenAI-compatible API format
+\item Different endpoint paths (/v1/completions vs /api/generate)
+\item Native streaming support
+\end{itemize}
+\end{sol}
+
+% TODO: Add solutions for remaining chapters as they are written
+
+% =============================================================================
+\section*{Solutions for Remaining Chapters}
+% =============================================================================
+
+Solutions for problems in chapters 3-18 will be provided in the companion repository at:
+
+\url{https://github.com/[repository-url]}
+
+The repository includes:
+\begin{itemize}
+\item Complete working code for all exercises
+\item Test harnesses for validating your implementations
+\item Benchmark scripts
+\item Configuration templates
+\end{itemize}

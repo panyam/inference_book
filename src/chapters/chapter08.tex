@@ -1,0 +1,289 @@
+%%%%%%%%%%%%%%%%%%%%% chapter08.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Chapter 8: Response Caching
+%
+%%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Response Caching}
+\label{ch:caching}
+
+\abstract*{Inference is expensive. Smart caching can dramatically reduce costs for repeated or similar queries. This chapter covers exact match caching, semantic caching with embeddings, cache invalidation strategies, and cache-aware routing. We implement a caching layer that integrates with the control plane while respecting the non-deterministic nature of LLM outputs.}
+
+\abstract{Inference is expensive. Smart caching can dramatically reduce costs for repeated or similar queries. This chapter covers exact match caching, semantic caching with embeddings, cache invalidation strategies, and cache-aware routing. We implement a caching layer that integrates with the control plane while respecting the non-deterministic nature of LLM outputs.}
+
+% =============================================================================
+\section{The Case for Caching}
+\label{sec:caching-case}
+% =============================================================================
+
+% TODO: Why cache inference results
+% - Inference is expensive
+% - Many queries repeat
+% - Latency improvement
+% - Cost reduction
+
+\subsection{When Caching Makes Sense}
+\label{subsec:when-caching}
+
+% TODO: Good candidates
+% - FAQ-style queries
+% - Code documentation
+% - Product descriptions
+% - Classification tasks
+
+\subsection{When Caching Doesn't Work}
+\label{subsec:when-not-caching}
+
+% TODO: Poor candidates
+% - Creative writing (uniqueness valued)
+% - Time-sensitive queries
+% - Personalized responses
+% - Low repeat rate
+
+% =============================================================================
+\section{Exact Match Caching}
+\label{sec:exact-caching}
+% =============================================================================
+
+% TODO: Simple exact match
+
+\subsection{Cache Key Design}
+\label{subsec:cache-key-design}
+
+% TODO: What goes in the key
+% - Prompt
+% - Model
+% - Temperature (if 0)
+% - System prompt
+
+\begin{programcode}{Cache Key Generation}
+\begin{lstlisting}[language=Go]
+// internal/cache/key.go
+
+package cache
+
+import (
+    "crypto/sha256"
+    "encoding/hex"
+    "encoding/json"
+)
+
+type CacheKey struct {
+    Model       string  `json:"model"`
+    Prompt      string  `json:"prompt"`
+    SystemPrompt string `json:"system_prompt,omitempty"`
+    Temperature float64 `json:"temperature"`
+    MaxTokens   int     `json:"max_tokens"`
+}
+
+func (k CacheKey) Hash() string {
+    data, _ := json.Marshal(k)
+    hash := sha256.Sum256(data)
+    return hex.EncodeToString(hash[:])
+}
+
+func IsCacheable(req backend.GenerateRequest) bool {
+    // Only cache deterministic requests
+    return req.Temperature == 0 || req.Temperature <= 0.1
+}
+\end{lstlisting}
+\end{programcode}
+
+\subsection{Implementation}
+\label{subsec:exact-cache-impl}
+
+% TODO: Simple exact match implementation
+
+% =============================================================================
+\section{Semantic Caching}
+\label{sec:semantic-caching}
+% =============================================================================
+
+% TODO: The smart approach
+
+\subsection{How Semantic Caching Works}
+\label{subsec:semantic-how}
+
+% TODO: Embedding-based similarity
+% - Generate embeddings for prompts
+% - Store in vector database
+% - Find similar queries
+% - Return cached response if similar enough
+
+\subsection{Embedding Models for Caching}
+\label{subsec:cache-embeddings}
+
+% TODO: Choosing embedding models
+% - Small, fast models
+% - Sentence transformers
+% - OpenAI embeddings
+% - Local options
+
+\subsection{Similarity Thresholds}
+\label{subsec:similarity-thresholds}
+
+% TODO: Setting thresholds
+% - Too high: poor hit rate
+% - Too low: wrong responses
+% - Task-dependent tuning
+
+\begin{programcode}{Semantic Cache Interface}
+\begin{lstlisting}[language=Go]
+// internal/cache/semantic.go
+
+type SemanticCache interface {
+    // Get finds semantically similar cached response
+    Get(ctx context.Context, key CacheKey) (*CacheEntry, error)
+
+    // Set stores response with embedding
+    Set(ctx context.Context, key CacheKey, response string, ttl time.Duration) error
+
+    // SetThreshold sets similarity threshold (0.0 - 1.0)
+    SetThreshold(threshold float64)
+}
+
+type CacheEntry struct {
+    Response   string
+    Similarity float64  // How similar the query was
+    CachedAt   time.Time
+    HitCount   int
+}
+
+type VectorSemanticCache struct {
+    embedder   Embedder
+    vectorDB   VectorStore
+    threshold  float64
+    exactCache Cache // Fallback to exact match
+}
+\end{lstlisting}
+\end{programcode}
+
+% =============================================================================
+\section{Cache Storage Options}
+\label{sec:cache-storage}
+% =============================================================================
+
+% TODO: Where to store cache
+
+\subsection{Redis}
+\label{subsec:redis-cache}
+
+% TODO: Redis for exact match
+% - Fast
+% - TTL support
+% - Distributed
+
+\subsection{Vector Databases}
+\label{subsec:vector-db-cache}
+
+% TODO: Vector DBs for semantic
+% - Qdrant
+% - Milvus
+% - Pinecone
+% - pgvector
+
+\subsection{Hybrid Approach}
+\label{subsec:hybrid-cache}
+
+% TODO: Combining both
+% - Exact match first (Redis)
+% - Semantic match second (Vector DB)
+
+% =============================================================================
+\section{Cache Invalidation}
+\label{sec:cache-invalidation}
+% =============================================================================
+
+% TODO: The hard problem
+
+\subsection{TTL-Based Invalidation}
+\label{subsec:ttl-invalidation}
+
+% TODO: Time-based expiry
+% - Simple and effective
+% - Task-appropriate TTLs
+
+\subsection{Model-Based Invalidation}
+\label{subsec:model-invalidation}
+
+% TODO: Invalidate on model change
+% - Model version tracking
+% - Automatic invalidation
+
+\subsection{Manual Invalidation}
+\label{subsec:manual-invalidation}
+
+% TODO: Admin controls
+% - Flush specific entries
+% - Bulk invalidation
+
+% =============================================================================
+\section{Cache Warming}
+\label{sec:cache-warming}
+% =============================================================================
+
+% TODO: Proactive caching
+% - Pre-computing common queries
+% - Background generation
+% - Traffic pattern analysis
+
+% =============================================================================
+\section{Metrics and Monitoring}
+\label{sec:cache-metrics}
+% =============================================================================
+
+% TODO: What to track
+% - Hit rate
+% - Miss rate
+% - Similarity distribution
+% - Cost savings
+
+% =============================================================================
+\section{Integration with Control Plane}
+\label{sec:cache-integration}
+% =============================================================================
+
+% TODO: Wiring it together
+% - Cache middleware
+% - Configuration
+% - Bypass options
+
+% =============================================================================
+\section{Summary}
+\label{sec:ch08-summary}
+% =============================================================================
+
+\begin{important}{Key Takeaways}
+\begin{itemize}
+\item Caching can reduce inference costs by 30-70\% for suitable workloads
+\item Exact match is simple but limited; semantic caching is more powerful
+\item Only cache deterministic requests (temperature $\approx$ 0)
+\item TTL-based invalidation is simple and usually sufficient
+\item Track cache hit rates and cost savings
+\end{itemize}
+\end{important}
+
+% =============================================================================
+\section*{Problems}
+\addcontentsline{toc}{section}{Problems}
+% =============================================================================
+
+\begin{prob}
+\label{prob:ch08-exact-cache}
+\textbf{Exact Match Cache}\\
+Implement an exact match cache using Redis. Include TTL support and metrics tracking.
+\end{prob}
+
+\begin{prob}
+\label{prob:ch08-semantic-cache}
+\textbf{Semantic Cache}\\
+Build a semantic cache using sentence embeddings and a vector database. Implement threshold tuning based on hit rate vs accuracy trade-off.
+\end{prob}
+
+\begin{prob}
+\label{prob:ch08-cache-analysis}
+\textbf{Cache Effectiveness Analysis}\\
+Given a dataset of 10,000 prompts, analyze the potential effectiveness of exact vs semantic caching. Calculate expected hit rates and cost savings.
+\end{prob}
+
+\input{chapters/references08}
