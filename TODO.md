@@ -1,8 +1,8 @@
-# Self-Hosted AI Inference: Book Progress Tracker
+# Inference Is All You Need: Book Progress Tracker
 
 ## Overview
 
-**Book Title:** Self-Hosted AI Inference: A Systems Engineer's Guide
+**Book Title:** Inference Is All You Need *(working title)*
 **Publisher:** Apress
 **Structure:** 4 Parts, 18 Chapters, 8 Appendices
 
@@ -730,6 +730,20 @@
 
 ---
 
+## Key Principle
+
+**"Self-hosted" = controlling your inference stack, not owning hardware.**
+
+This book is infrastructure agnostic. Readers may deploy on:
+- Cloud GPU instances (AWS, GCP, Azure, Lambda Labs, RunPod)
+- Colocated servers
+- On-premise data centers
+- Local workstations
+
+The patterns, code, and architecture apply equally to all deployment models.
+
+---
+
 ## Decisions Made
 
 - Go for control plane (not Python) - performance + deployment
@@ -737,6 +751,7 @@
 - OpenAI-compatible API throughout
 - vLLM as primary production engine
 - Chapter 5.5 (Browser AI) is optional
+- **Infrastructure agnostic** - cloud and local treated equally throughout
 
 ---
 

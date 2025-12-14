@@ -19,11 +19,12 @@ This is your **single source of truth** for writing the book. It combines:
 
 ## Book Overview
 
-**Title:** Self-Hosted AI Inference: A Systems Engineer's Guide
+**Title:** Inference Is All You Need *(working title)*
 
-**Target Audience:** Software and systems engineers who want to self-host models and build AI systems locally (or on rented GPU infrastructure)
+**Target Audience:** Software and systems engineers who want to run inference on infrastructure they control---whether cloud instances, colocated servers, or local hardware.
 
-**Core Philosophy:** 
+**Core Philosophy:**
+- **Infrastructure agnostic** - "self-hosted" means controlling your inference stack, not owning hardware. Deploy on AWS, GCP, a colo, or under your desk---the patterns are the same.
 - Progressive complexity - build one control plane that evolves from serving 7B models to operating a 400B inference lab
 - Learning by building - each chapter adds real capability to a Go-based control plane
 - No rewrites - interfaces and features accumulate, nothing gets thrown away

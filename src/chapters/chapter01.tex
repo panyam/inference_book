@@ -7,22 +7,22 @@
 \chapter{Introduction to Self-Hosted Inference}
 \label{ch:introduction}
 
-\abstract*{This chapter introduces the concept of self-hosted AI inference, explaining why organizations and individuals choose to run their own models rather than relying on cloud APIs. We cover the fundamental differences between training and inference, the economic and strategic considerations for self-hosting, and provide a roadmap for what you'll build throughout this book. By the end of this chapter, you'll run your first local model and make your first inference request.}
+\abstract*{This chapter introduces self-hosted AI inference: running models on infrastructure you control rather than consuming managed API services. We cover the fundamental differences between training and inference, the economic and strategic considerations for controlling your inference stack, and provide a roadmap for what you'll build throughout this book. By the end of this chapter, you'll run your first model and make your first inference request.}
 
-\abstract{This chapter introduces the concept of self-hosted AI inference, explaining why organizations and individuals choose to run their own models rather than relying on cloud APIs. We cover the fundamental differences between training and inference, the economic and strategic considerations for self-hosting, and provide a roadmap for what you'll build throughout this book. By the end of this chapter, you'll run your first local model and make your first inference request.}
+\abstract{This chapter introduces self-hosted AI inference: running models on infrastructure you control rather than consuming managed API services. We cover the fundamental differences between training and inference, the economic and strategic considerations for controlling your inference stack, and provide a roadmap for what you'll build throughout this book. By the end of this chapter, you'll run your first model and make your first inference request.}
 
 % =============================================================================
 \section{The Rise of Self-Hosted AI}
 \label{sec:rise-of-self-hosted}
 % =============================================================================
 
-The landscape of AI deployment shifted fundamentally in 2023 when Meta released Llama 2 under a permissive license~\cite{touvron2023llama2}. For the first time, a model competitive with commercial APIs was available for local deployment. Other organizations followed: Mistral AI released their 7B model in September 2023~\cite{jiang2023mistral}, Alibaba open-sourced the Qwen family~\cite{bai2023qwen}, Microsoft published the Phi series optimized for efficiency~\cite{li2023phi}, and Google contributed Gemma~\cite{team2024gemma}.
+The landscape of AI deployment shifted fundamentally in 2023 when Meta released Llama 2 under a permissive license~\cite{touvron2023llama2}. For the first time, a model competitive with commercial APIs was available for independent deployment---on your own terms, on infrastructure you control. Other organizations followed: Mistral AI released their 7B model in September 2023~\cite{jiang2023mistral}, Alibaba open-sourced the Qwen family~\cite{bai2023qwen}, Microsoft published the Phi series optimized for efficiency~\cite{li2023phi}, and Google contributed Gemma~\cite{team2024gemma}.
 
-These models can run on consumer hardware. A 7 billion parameter model quantized to 4-bit precision requires approximately 4GB of VRAM---well within the capacity of a laptop GPU or even a MacBook's unified memory. The barrier to entry is no longer access to models or specialized hardware; it's the systems knowledge required to deploy and operate them reliably.
+These models have modest compute requirements. A 7 billion parameter model quantized to 4-bit precision requires approximately 4GB of VRAM---achievable on a laptop GPU, a cloud instance, or a MacBook's unified memory. The barrier to entry is no longer access to models or specialized infrastructure; it's the systems knowledge required to deploy and operate them reliably.
 
-When you use a hosted API, the trade-offs are straightforward: you pay per token, accept the provider's latency (typically 50--200ms for first token), and send your data to external servers. When you self-host, those trade-offs invert. Your per-request costs drop to fractions of a cent after the initial hardware investment. Latency becomes a function of your local compute rather than network round-trips. Your data never leaves infrastructure you control.
+When you use a managed API, the trade-offs are straightforward: you pay per token, accept the provider's latency (typically 50--200ms for first token), and send your data to external servers. When you control the inference stack, those trade-offs invert. Your per-request costs become predictable. Latency becomes a function of your chosen infrastructure rather than shared services and network round-trips. Your data stays within boundaries you define.
 
-The complexity trade-off is real. Self-hosting requires understanding GPU memory hierarchies, model quantization formats, inference engine architectures, and production deployment patterns. This book provides that knowledge systematically, building from a single 7B model on a laptop to a distributed 400B deployment across multiple GPUs.
+The complexity trade-off is real. Running your own inference requires understanding GPU memory hierarchies, model quantization formats, inference engine architectures, and production deployment patterns. This book provides that knowledge systematically, whether you're deploying on a cloud GPU instance, a colocated server, or a workstation under your desk.
 
 % =============================================================================
 \section{Training vs. Inference: Understanding the Difference}
@@ -202,64 +202,119 @@ The break-even calculation depends on utilization. A \$2,000 GPU investment pays
 \subsection{Privacy and Data Sovereignty}
 \label{subsec:privacy}
 
-% TODO: Privacy considerations
-% - What data leaves your control with APIs
-% - Regulatory requirements (GDPR, HIPAA, etc.)
-% - Industries where this matters most
-% - Air-gapped deployments
+When you send a prompt to an external API, that data travels over the internet to servers you don't control. Most providers retain prompts and responses for some period---OpenAI's default retention is 30 days, with options to disable~\cite{openai2025dataretention}. Even with retention disabled, your data still traverses external infrastructure.
+
+For many applications, this is acceptable. For others, it's a non-starter:
+
+\begin{itemize}
+\item \textbf{Healthcare}: Patient data falls under HIPAA in the US, requiring Business Associate Agreements (BAAs) with any third party processing protected health information. Not all API providers offer BAAs, and even those that do add compliance overhead.
+\item \textbf{Legal}: Attorney-client privilege may be compromised if confidential case details are processed by external services.
+\item \textbf{Finance}: Regulations like GDPR, SOX, and various banking laws impose strict requirements on where data can be processed and stored.
+\item \textbf{Government}: Many agencies require data to remain within specific geographic boundaries or on classified networks.
+\end{itemize}
+
+There are two paths to addressing these concerns. First, major cloud providers offer compliant AI services---AWS, Azure, and Google Cloud all provide HIPAA-eligible and SOC 2 certified infrastructure for running inference workloads. You can deploy open models on these platforms while satisfying regulatory requirements. Second, you can run inference on your own infrastructure, whether that's a server in your office or a private cloud deployment.
+
+This book covers both approaches. "Self-hosted" doesn't mean running your own data center---it means running inference infrastructure you control, wherever that infrastructure lives. You might deploy on a HIPAA-compliant AWS instance, a GPU server in a colocation facility, or a workstation under your desk. The common thread is that you choose the model, control the deployment, and own the infrastructure decisions.
+
+The trade-off is responsibility. You become accountable for securing the inference infrastructure, managing access controls, and maintaining audit logs. For air-gapped environments---networks with no internet connectivity---self-hosting is the only option. For compliant cloud deployments, you inherit some security controls from the provider while retaining others.
 
 \subsection{Latency and Performance}
 \label{subsec:latency}
 
-% TODO: Performance benefits
-% - Network round-trip elimination
-% - Consistent response times
-% - Geographic considerations
+Managed API latency has two components: network round-trip time and inference time. A request from New York to a data center in California adds 60--80ms of network latency before inference even begins. For interactive applications---chat interfaces, code completion, real-time assistants---this overhead matters.
+
+When you control the inference stack, you control placement. Deploy in the same region as your users, or on the same network as your application servers, and network latency drops to single-digit milliseconds. For latency-critical workloads, you can colocate inference with the consuming application.
+
+Consistency is equally important. Managed APIs serve many customers on shared infrastructure. During peak demand, you compete for resources with other users, leading to variable response times. Your P99 latency might be 3x your median latency. With dedicated infrastructure---whether a reserved cloud instance or on-premise hardware---your latency distribution tightens because you're not sharing resources.
+
+The performance trade-off depends on model size and hardware. A 7B model on a mid-range GPU delivers 30--50 tokens per second with time-to-first-token under 100ms. That's competitive with managed APIs for most workloads. Larger models on slower hardware may underperform managed services that run on cutting-edge GPUs with aggressive optimization. Chapter~\ref{ch:hardware} helps you match hardware to performance requirements.
 
 \subsection{Customization and Control}
 \label{subsec:customization}
 
-% TODO: What you can do when you own the stack
-% - Fine-tuning
-% - Custom inference parameters
-% - No usage limits or quotas
-% - Model selection freedom
+Managed APIs expose a fixed set of models with predetermined parameters. You get what the provider offers. When you control the stack, you choose everything:
+
+\begin{itemize}
+\item \textbf{Model selection}: Run any open-weight model---Llama, Mistral, Qwen, Phi, or specialized models for code, math, or specific languages. Switch models without changing providers or renegotiating contracts.
+\item \textbf{Fine-tuning}: Adapt models to your domain with your data. A legal firm can fine-tune on case law; a medical organization can specialize for clinical terminology. The fine-tuned weights stay on your infrastructure.
+\item \textbf{Inference parameters}: Control temperature, top-p, repetition penalties, and stopping conditions precisely. Some parameters available on your own deployment aren't exposed by managed APIs.
+\item \textbf{No quotas}: Managed APIs impose rate limits and usage caps, especially on newer or more capable models. Your infrastructure has no artificial limits---only the throughput your hardware can sustain.
+\item \textbf{Version pinning}: Lock to a specific model version for reproducibility. Managed APIs occasionally update models, subtly changing behavior. With your own deployment, the model only changes when you change it.
+\end{itemize}
+
+This control matters most when AI is core to your product rather than a peripheral feature. If model behavior directly affects your business outcomes, controlling that behavior becomes a strategic priority.
 
 \subsection{When NOT to Self-Host}
 \label{subsec:when-not-to-self-host}
 
-% TODO: Honest assessment of trade-offs
-% - Small scale / experimentation
-% - Rapidly changing requirements
-% - Need for cutting-edge models immediately
-% - Lack of infrastructure expertise
+Self-hosting isn't always the right choice. Managed APIs win in several scenarios:
+
+\begin{itemize}
+\item \textbf{Low or unpredictable volume}: If you're making hundreds of requests per day rather than thousands, the operational overhead of maintaining inference infrastructure exceeds the cost savings. APIs let you pay only for what you use.
+\item \textbf{Experimentation phase}: When you're still figuring out whether AI adds value to your product, managed APIs let you iterate without infrastructure commitment. Build the prototype first; optimize deployment later.
+\item \textbf{Cutting-edge models}: The best open-weight models lag behind frontier closed models by 6--12 months. If you need GPT-5 or Claude Opus capabilities today, APIs are your only option.
+\item \textbf{Multimodal requirements}: Open models for vision, audio, and video generation are maturing but still trail proprietary alternatives in quality. Complex multimodal pipelines may require API access.
+\item \textbf{Limited engineering capacity}: Running inference infrastructure requires systems engineering skills---debugging GPU memory issues, optimizing throughput, maintaining uptime. If your team lacks this expertise and can't acquire it, the learning curve may not justify the benefits.
+\end{itemize}
+
+The decision isn't binary. Many organizations use managed APIs for experimentation and frontier capabilities while self-hosting for high-volume production workloads with stable requirements. Chapter~\ref{ch:hardware} includes a decision framework for evaluating which workloads to self-host.
 
 % =============================================================================
 \section{What You'll Build in This Book}
 \label{sec:what-youll-build}
 % =============================================================================
 
-% TODO: Roadmap of the book
-% - Progressive control plane (v0.1 -> v1.0)
-% - From 7B to 400B
-% - The CodeLab capstone project
+This book teaches inference systems by building one. You'll construct a control plane---the software layer that manages model serving---and evolve it from a simple proxy to a production-grade platform. The models grow alongside the infrastructure: from 7B parameters on a single GPU to 400B distributed across a cluster.
 
 \subsection{The Progressive Journey}
 \label{subsec:progressive-journey}
 
-% TODO: Explain the 4-part structure
-% - Part I: 7B foundations
-% - Part II: 30B production
-% - Part III: 70B multi-tenant
-% - Part IV: 400B inference lab
+The book is organized into four parts, each targeting a larger model size and adding capabilities to the control plane:
+
+\begin{description}
+\item[Part I: Foundations (7B)] You'll run your first model, understand hardware requirements, learn model formats and quantization, compare inference engines, and build Control Plane v0.1---a basic proxy with health checks and metrics. A single consumer GPU or cloud instance handles everything.
+
+\item[Part II: Production (30B)] The control plane gains authentication, rate limiting, caching, and request queuing. You'll deploy 30B models that require more careful memory management and learn optimization techniques that squeeze maximum throughput from your hardware.
+
+\item[Part III: Multi-Tenant (70B)] Control Plane v0.3 supports multiple tenants with isolated quotas, usage tracking, and billing integration. You'll distribute 70B models across multiple GPUs using tensor parallelism and build routing logic that directs requests to appropriate backends.
+
+\item[Part IV: Inference Lab (400B)] The capstone: a 400B parameter deployment on H100 GPUs, serving a coding assistant called CodeLab. Control Plane v1.0 includes everything needed to operate inference at scale---the complete system you've built across the book.
+\end{description}
 
 \subsection{Control Plane Evolution}
 \label{subsec:control-plane-evolution}
 
-% TODO: Preview the control plane architecture
-% - Why Go
-% - Interface-driven design
-% - Feature flags for progressive capabilities
+The control plane is written in Go. This choice is deliberate: Go compiles to a single binary with no runtime dependencies, making deployment straightforward. Its concurrency model handles many simultaneous inference requests efficiently. And Go is readable---you don't need deep language expertise to understand or modify the code.
+
+The architecture uses interfaces to abstract components. An \texttt{InferenceBackend} interface defines how the control plane talks to inference engines; implementations exist for Ollama, llama.cpp, and vLLM. When you add vLLM support in Part II, you implement the interface without changing the rest of the system. This pattern repeats throughout: \texttt{RateLimiter}, \texttt{Cache}, \texttt{Router}, \texttt{BillingProvider}---each is an interface with swappable implementations.
+
+\begin{table}[htbp]
+\centering
+\caption{Control plane evolution across the book.}
+\label{tab:control-plane-versions}
+\begin{tabular}{llp{7cm}}
+\toprule
+\textbf{Version} & \textbf{Part} & \textbf{Key Capabilities} \\
+\midrule
+v0.1 & I & Single backend, health checks, Prometheus metrics \\
+v0.2 & II & Auth, rate limiting, caching, request queue \\
+v0.3 & III & Multi-tenant, usage tracking, billing, model routing \\
+v1.0 & IV & Distributed inference, advanced scheduling, complete platform \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Each version builds on the previous. Code from Chapter 5 remains in the final system; it just gains neighbors. This mirrors how production systems actually evolve---incrementally, with backward compatibility.
+
+\subsection{What You'll Learn Beyond the Code}
+\label{subsec:beyond-the-code}
+
+The control plane is the tangible artifact, but the deeper goal is building intuition. You'll learn enough about transformer memory layout to calculate VRAM requirements for any model. You'll understand quantization well enough to choose between Q4\_K\_M and Q5\_K\_S for your workload. You'll grasp attention mechanisms sufficiently to reason about KV cache growth and context length trade-offs.
+
+This isn't a machine learning theory book---we won't derive backpropagation or prove convergence bounds. But we cover the systems-relevant math: memory calculations, throughput modeling, parallelism strategies. When new techniques emerge---mixture of experts, speculative decoding, expert parallelism---you'll have the mental framework to evaluate them. Chapter~\ref{ch:optimization} implements expert parallelism from scratch, not just to use it, but to understand when and why it helps.
+
+The field moves fast. Models that seem large today will be routine tomorrow. The specific numbers in this book will date; the systems thinking won't. Our aim is engineers who can read a new model's architecture paper and estimate what hardware it needs, or evaluate a new inference engine and predict where it will excel.
 
 % =============================================================================
 \section{Hands-On: Your First Local Inference}
