@@ -81,88 +81,8 @@ build_chapter() {
     # Create a temporary standalone file for this chapter
     local temp_file="${GEN_DIR}/temp_${chapter_name}.tex"
 
-    cat > "${temp_file}" << 'HEADER'
-\documentclass[graybox,envcountchap,sectrefs]{svmono}
-
-\usepackage{type1cm}
-\usepackage{makeidx}
-\usepackage{graphicx}
-\usepackage{multicol}
-\usepackage[bottom]{footmisc}
-\usepackage[T1]{fontenc}
-\usepackage{newtxtext}
-\usepackage[varvw]{newtxmath}
-\usepackage{textcomp}
-\usepackage{listings}
-\usepackage{xcolor}
-\usepackage{upquote}
-\usepackage{hyperref}
-\usepackage{booktabs}
-\usepackage{longtable}
-\usepackage{amsmath}
-\usepackage{tikz}
-\usetikzlibrary{positioning}
-
-% Code listing style for Go
-\lstdefinelanguage{Go}{
-  keywords={break, case, chan, const, continue, default, defer, else, fallthrough, for, func, go, goto, if, import, interface, map, package, range, return, select, struct, switch, type, var},
-  keywordstyle=\color{blue}\bfseries,
-  ndkeywords={string, int, int64, float64, bool, error, nil, true, false, context, Context},
-  ndkeywordstyle=\color{teal}\bfseries,
-  identifierstyle=\color{black},
-  sensitive=true,
-  comment=[l]{//},
-  morecomment=[s]{/*}{*/},
-  commentstyle=\color{gray}\ttfamily,
-  stringstyle=\color{red}\ttfamily,
-  morestring=[b]',
-  morestring=[b]",
-  morestring=[b]`
-}
-
-% Code listing style - optimized for copy-paste
-\lstset{
-  basicstyle=\small\ttfamily,
-  breakatwhitespace=false,
-  breaklines=true,
-  captionpos=b,
-  keepspaces=true,
-  columns=fullflexible,
-  numbers=none,
-  showspaces=false,
-  showstringspaces=false,
-  showtabs=false,
-  tabsize=2,
-  frame=single,
-  framerule=0.5pt,
-  rulecolor=\color{gray},
-  backgroundcolor=\color{gray!5},
-  upquote=true
-}
-
-\hypersetup{
-  colorlinks=true,
-  linkcolor=blue,
-  filecolor=magenta,
-  urlcolor=cyan,
-}
-
-\graphicspath{{figures/}}
-
-\makeindex
-
-\begin{document}
-
-\author{Author Name}
-\title{Self-Hosted AI Inference}
-\subtitle{A Systems Engineer's Guide}
-
-\frontmatter
-\maketitle
-\tableofcontents
-
-\mainmatter
-HEADER
+    # Start with the header template
+    cat "${SRC_DIR}/styles/chapter-template-header.tex" > "${temp_file}"
 
     # Extract chapter number and set counter appropriately
     local chapter_num=$(echo "${chapter_name}" | sed 's/chapter0*//' | sed 's/_.*$//')
@@ -174,9 +94,8 @@ HEADER
     # Add the chapter include
     echo "\\input{${chapter_file}}" >> "${temp_file}"
 
-    # Close document
-    echo "" >> "${temp_file}"
-    echo "\\end{document}" >> "${temp_file}"
+    # Add the footer template
+    cat "${SRC_DIR}/styles/chapter-template-footer.tex" >> "${temp_file}"
 
     # Build the chapter
     cd "${SRC_DIR}"
@@ -224,71 +143,14 @@ build_appendix() {
     # Similar to chapter build but for appendices
     local temp_file="${GEN_DIR}/temp_${appendix_name}.tex"
 
-    cat > "${temp_file}" << 'HEADER'
-\documentclass[graybox,envcountchap,sectrefs]{svmono}
+    # Use the same template as chapters
+    cat "${SRC_DIR}/styles/chapter-template-header.tex" > "${temp_file}"
 
-\usepackage{type1cm}
-\usepackage{makeidx}
-\usepackage{graphicx}
-\usepackage{multicol}
-\usepackage[bottom]{footmisc}
-\usepackage{newtxtext}
-\usepackage[varvw]{newtxmath}
-\usepackage{listings}
-\usepackage{xcolor}
-\usepackage{hyperref}
-\usepackage{booktabs}
-\usepackage{longtable}
-\usepackage{amsmath}
-\usepackage{tikz}
-\usetikzlibrary{positioning}
-
-\lstset{
-  basicstyle=\small\ttfamily,
-  breakatwhitespace=false,
-  breaklines=true,
-  captionpos=b,
-  keepspaces=true,
-  numbers=left,
-  numbersep=5pt,
-  numberstyle=\tiny\color{gray},
-  showspaces=false,
-  showstringspaces=false,
-  showtabs=false,
-  tabsize=2,
-  frame=single,
-  framerule=0.5pt,
-  rulecolor=\color{gray},
-  backgroundcolor=\color{gray!5}
-}
-
-\hypersetup{
-  colorlinks=true,
-  linkcolor=blue,
-  filecolor=magenta,
-  urlcolor=cyan,
-}
-
-\graphicspath{{figures/}}
-
-\makeindex
-
-\begin{document}
-
-\author{Author Name}
-\title{Self-Hosted AI Inference}
-\subtitle{A Systems Engineer's Guide}
-
-\frontmatter
-\maketitle
-\tableofcontents
-
-\mainmatter
-HEADER
-
+    # Add the appendix include
     echo "\\input{${appendix_file}}" >> "${temp_file}"
-    echo "" >> "${temp_file}"
-    echo "\\end{document}" >> "${temp_file}"
+
+    # Add the footer template
+    cat "${SRC_DIR}/styles/chapter-template-footer.tex" >> "${temp_file}"
 
     cd "${SRC_DIR}"
     ${LATEX_CMD} -output-directory="${GEN_DIR}" "${temp_file}" || true

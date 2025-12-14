@@ -8,80 +8,8 @@
 % RECOMMENDED %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \documentclass[graybox,envcountchap,sectrefs]{svmono}
 
-% Package imports
-\usepackage{type1cm}
-\usepackage{makeidx}         % allows index generation
-\usepackage{graphicx}        % standard LaTeX graphics tool
-\usepackage{multicol}        % used for the two-column index
-\usepackage[bottom]{footmisc}% places footnotes at page bottom
-
-\usepackage[T1]{fontenc}     % proper font encoding for quotes
-\usepackage{newtxtext}
-\usepackage[varvw]{newtxmath}% selects Times Roman as basic font
-\usepackage{textcomp}        % additional text symbols
-
-% Additional packages for technical book
-\usepackage{listings}        % code listings
-\usepackage{xcolor}          % colors for code
-\usepackage{upquote}         % preserve straight quotes in listings
-\usepackage{hyperref}        % hyperlinks
-\usepackage{booktabs}        % better tables
-\usepackage{longtable}       % multi-page tables
-\usepackage{amsmath}         % math extensions
-\usepackage{tikz}            % diagrams and figures
-\usetikzlibrary{positioning} % relative positioning
-
-% Code listing style for Go
-\lstdefinelanguage{Go}{
-  keywords={break, case, chan, const, continue, default, defer, else, fallthrough, for, func, go, goto, if, import, interface, map, package, range, return, select, struct, switch, type, var},
-  keywordstyle=\color{blue}\bfseries,
-  ndkeywords={string, int, int64, float64, bool, error, nil, true, false, context, Context},
-  ndkeywordstyle=\color{teal}\bfseries,
-  identifierstyle=\color{black},
-  sensitive=true,
-  comment=[l]{//},
-  morecomment=[s]{/*}{*/},
-  commentstyle=\color{gray}\ttfamily,
-  stringstyle=\color{red}\ttfamily,
-  morestring=[b]',
-  morestring=[b]",
-  morestring=[b]`
-}
-
-% Code listing style defaults - optimized for copy-paste
-\lstset{
-  basicstyle=\small\ttfamily,
-  breakatwhitespace=false,
-  breaklines=true,
-  captionpos=b,
-  keepspaces=true,
-  columns=fullflexible,
-  numbers=none,
-  showspaces=false,
-  showstringspaces=false,
-  showtabs=false,
-  tabsize=2,
-  frame=single,
-  framerule=0.5pt,
-  rulecolor=\color{gray},
-  backgroundcolor=\color{gray!5},
-  upquote=true
-}
-
-% Hyperref setup
-\hypersetup{
-  colorlinks=true,
-  linkcolor=blue,
-  filecolor=magenta,
-  urlcolor=cyan,
-  pdftitle={Self-Hosted AI Inference: A Systems Engineer's Guide},
-  pdfauthor={Author Name},
-  pdfsubject={AI Infrastructure, Machine Learning Operations},
-  pdfkeywords={AI, inference, LLM, GPU, self-hosted, control plane}
-}
-
-% Graphics path
-\graphicspath{{figures/}}
+% Load shared preamble (all packages, styles, and settings)
+\input{styles/shared-preamble}
 
 % Index generation
 \makeindex
