@@ -1,140 +1,143 @@
-%%%%%%%%%%%%%%%%%%%%% chapter17.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%% chapter16.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% Chapter 17: Building CodeLab - A Commercial AI Coding Assistant
+% Chapter 16: 400B Deployment and H100 Optimization
 %
 %%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Building CodeLab: A Commercial AI Coding Assistant}
-\label{ch:codelab}
+\chapter{400B Deployment and H100 Optimization}
+\label{ch:400b-deployment}
 
-\abstract*{This capstone chapter brings everything together to build CodeLab, a commercial-grade AI coding assistant. We cover the complete product architecture, IDE integration (VS Code, JetBrains), code completion and chat interfaces, context management, and productization. By the end, you'll have a working Copilot alternative running on your infrastructure.}
+\abstract*{400B models represent the frontier of self-hosted inference. This chapter covers H100 hardware characteristics, deploying massive models across GPU clusters, network topology optimization, and the economics of large-scale inference. We configure an 8-GPU H100 deployment capable of serving production traffic.}
 
-\abstract{This capstone chapter brings everything together to build CodeLab, a commercial-grade AI coding assistant. We cover the complete product architecture, IDE integration (VS Code, JetBrains), code completion and chat interfaces, context management, and productization. By the end, you'll have a working Copilot alternative running on your infrastructure.}
-
-% =============================================================================
-\section{CodeLab Architecture}
-\label{sec:codelab-architecture}
-% =============================================================================
-
-% TODO: Overall architecture
-% - IDE extensions
-% - Gateway service
-% - Control plane
-% - Model backends
+\abstract{400B models represent the frontier of self-hosted inference. This chapter covers H100 hardware characteristics, deploying massive models across GPU clusters, network topology optimization, and the economics of large-scale inference. We configure an 8-GPU H100 deployment capable of serving production traffic.}
 
 % =============================================================================
-\section{Code Completion API}
-\label{sec:code-completion}
+\section{H100 Hardware Deep Dive}
+\label{sec:h100-hardware}
 % =============================================================================
 
-% TODO: Completion interface
-% - FIM (Fill-in-the-Middle)
-% - Context gathering
-% - Streaming responses
+% TODO: H100 characteristics
+% - Specs: 80GB HBM3, 3TB/s bandwidth
+% - Tensor cores
+% - FP8 support
+% - NVLink 4.0
 
-\begin{programcode}{Code Completion API}
-\begin{lstlisting}[language=Go]
-// internal/codelab/completion.go
+\subsection{H100 vs A100}
+\label{subsec:h100-vs-a100}
 
-type CompletionRequest struct {
-    Prefix      string `json:"prefix"`      // Code before cursor
-    Suffix      string `json:"suffix"`      // Code after cursor
-    Language    string `json:"language"`
-    FilePath    string `json:"file_path"`
-    MaxTokens   int    `json:"max_tokens"`
-}
+% TODO: Comparison
+% - Performance
+% - Memory bandwidth
+% - Pricing
+% - Availability
 
-type CompletionResponse struct {
-    Completions []Completion `json:"completions"`
-}
+\subsection{SXM vs PCIe}
+\label{subsec:sxm-pcie}
 
-type Completion struct {
-    Text       string  `json:"text"`
-    Confidence float64 `json:"confidence"`
-}
+% TODO: Form factors
+% - SXM for NVLink
+% - PCIe for flexibility
+
+% =============================================================================
+\section{400B Model Requirements}
+\label{sec:400b-requirements}
+% =============================================================================
+
+% TODO: What it takes
+% - Memory calculation
+% - Communication requirements
+% - Minimum GPU count
+
+\begin{svgraybox}
+\textbf{400B Model Memory Requirements:}
+
+\begin{itemize}
+\item FP16 weights: $400B \times 2$ bytes = 800GB
+\item INT8 quantized: $400B \times 1$ byte = 400GB
+\item INT4 quantized: $400B \times 0.5$ bytes = 200GB
+\item KV cache (4K context, batch 8): ~50GB additional
+\item Total with overhead (INT4): ~280GB = 4x H100 minimum
+\end{itemize}
+
+\textbf{Recommended:} 8x H100 80GB for production headroom
+\end{svgraybox}
+
+% =============================================================================
+\section{Network Topology}
+\label{sec:topology-400b}
+% =============================================================================
+
+% TODO: Optimal connectivity
+% - NVSwitch
+% - InfiniBand
+% - Topology considerations
+
+% =============================================================================
+\section{Deployment Configuration}
+\label{sec:400b-config}
+% =============================================================================
+
+\begin{programcode}{400B Deployment with vLLM}
+\begin{lstlisting}[language=bash]
+# 8-GPU H100 configuration for 400B model
+python -m vllm.entrypoints.openai.api_server \
+    --model meta-llama/Llama-3.1-400B-Instruct \
+    --tensor-parallel-size 8 \
+    --dtype float16 \
+    --max-model-len 8192 \
+    --gpu-memory-utilization 0.95 \
+    --max-num-batched-tokens 8192 \
+    --enable-prefix-caching \
+    --enable-chunked-prefill
 \end{lstlisting}
 \end{programcode}
 
 % =============================================================================
-\section{Chat Interface}
-\label{sec:chat-interface}
+\section{Economics at Scale}
+\label{sec:economics-scale}
 % =============================================================================
 
-% TODO: Code-aware chat
-% - File context
-% - Repository context
-% - Action suggestions
+% TODO: Cost analysis
+% - Hardware cost (8x H100)
+% - Power and cooling
+% - Operational costs
+% - Cost per token
+
+\subsection{Build vs Rent}
+\label{subsec:build-rent-400b}
+
+% TODO: The big decision
+% - Ownership: $250K+ hardware
+% - Rental: $20-40/hour cloud
+
+\subsection{Break-Even Analysis}
+\label{subsec:break-even-400b}
+
+% TODO: When to own
+% - High utilization threshold
+% - Timeline considerations
 
 % =============================================================================
-\section{Context Management}
-\label{sec:context-management}
+\section{Performance Optimization}
+\label{sec:400b-optimization}
 % =============================================================================
 
-% TODO: Gathering context
-% - Current file
-% - Open files
-% - Related files
-% - Repository structure
-
-\subsection{RAG for Code}
-\label{subsec:code-rag}
-
-% TODO: Code embeddings
-% - Chunking strategies
-% - Retrieval
-
-% =============================================================================
-\section{VS Code Extension}
-\label{sec:vscode-extension}
-% =============================================================================
-
-% TODO: Building the extension
-% - Extension structure
-% - Inline completions API
-% - Chat participant API
-
-% =============================================================================
-\section{JetBrains Plugin}
-\label{sec:jetbrains}
-% =============================================================================
-
-% TODO: IntelliJ platform
-% - Plugin structure
-% - Completion provider
-
-% =============================================================================
-\section{Model Selection for Code}
-\label{sec:code-models}
-% =============================================================================
-
-% TODO: Best models for coding
-% - DeepSeek Coder
-% - CodeLlama
-% - Qwen Coder
-% - StarCoder
-
-% =============================================================================
-\section{Productization}
-\label{sec:productization}
-% =============================================================================
-
-% TODO: Making it a product
-% - User onboarding
-% - Telemetry
-% - Feedback loop
-% - Pricing
+% TODO: Squeezing out performance
+% - FP8 quantization
+% - Speculative decoding
+% - Batch optimization
 
 % =============================================================================
 \section{Summary}
-\label{sec:ch17-summary}
+\label{sec:ch16-summary}
 % =============================================================================
 
 \begin{important}{Key Takeaways}
 \begin{itemize}
-\item CodeLab demonstrates a complete commercial AI product
-\item IDE integration requires understanding extension APIs
-\item Context management is crucial for code quality
-\item Specialized code models outperform general-purpose
+\item 400B models require 8+ H100 GPUs
+\item NVLink is essential for performance
+\item Economics favor ownership at high utilization
+\item Proper configuration can double throughput
 \end{itemize}
 \end{important}
 
@@ -142,8 +145,8 @@ type Completion struct {
 \addcontentsline{toc}{section}{Problems}
 
 \begin{prob}
-\label{prob:ch17-extension}
-Build a minimal VS Code extension that provides code completion using your control plane API.
+\label{prob:ch16-cost-model}
+Create a detailed cost model comparing owning 8x H100 versus renting from cloud providers. Include all costs over 3 years.
 \end{prob}
 
-\input{chapters/references17}
+\input{chapters/references16}

@@ -1,160 +1,295 @@
-%%%%%%%%%%%%%%%%%%%%% chapter11.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%% chapter10.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% Chapter 11: Multi-Tenant Architecture
+% Chapter 10: 30B Model Optimization
 %
 %%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Multi-Tenant Architecture}
-\label{ch:multi-tenant}
+\chapter{30B Model Optimization}
+\label{ch:30b-optimization}
 
-\abstract*{Serving multiple organizations requires careful architectural decisions. This chapter covers tenant isolation strategies, data separation, resource allocation, and the organizational model that underlies a multi-tenant inference platform. We design a system that provides strong isolation while efficiently sharing underlying infrastructure.}
+\abstract*{Moving from 7B to 30B models introduces new challenges. This chapter covers memory management at scale, KV cache optimization, batching strategies for throughput, vLLM tuning, and multi-model serving. We optimize our deployment to efficiently serve 30B models while maintaining acceptable latency.}
 
-\abstract{Serving multiple organizations requires careful architectural decisions. This chapter covers tenant isolation strategies, data separation, resource allocation, and the organizational model that underlies a multi-tenant inference platform. We design a system that provides strong isolation while efficiently sharing underlying infrastructure.}
-
-% =============================================================================
-\section{Multi-Tenancy Concepts}
-\label{sec:mt-concepts}
-% =============================================================================
-
-% TODO: Foundational concepts
-% - What is multi-tenancy
-% - Why it matters for inference
-% - Isolation vs sharing trade-offs
+\abstract{Moving from 7B to 30B models introduces new challenges. This chapter covers memory management at scale, KV cache optimization, batching strategies for throughput, vLLM tuning, and multi-model serving. We optimize our deployment to efficiently serve 30B models while maintaining acceptable latency.}
 
 % =============================================================================
-\section{Isolation Models}
-\label{sec:isolation-models}
+\section{The 30B Challenge}
+\label{sec:30b-challenge}
 % =============================================================================
 
-\subsection{Shared Everything}
-\label{subsec:shared-everything}
+% TODO: What changes at 30B
+% - Memory requirements
+% - Throughput considerations
+% - Hardware requirements
 
-% TODO: Single pool approach
-% - All tenants share resources
-% - Simple but risky
-% - Noisy neighbor problem
+\subsection{Memory Requirements}
+\label{subsec:30b-memory}
 
-\subsection{Namespace Isolation}
-\label{subsec:namespace-isolation}
+% TODO: Calculate memory needs
+% - Model weights
+% - KV cache
+% - Activations
+% - Overhead
 
-% TODO: Logical separation
-% - Separate data but shared compute
-% - Good balance for most cases
+\begin{svgraybox}
+\textbf{30B Model Memory Requirements:}
 
-\subsection{Dedicated Resources}
-\label{subsec:dedicated-resources}
+\begin{itemize}
+\item FP16 weights: $30B \times 2$ bytes = 60GB
+\item INT8 quantized: $30B \times 1$ byte = 30GB
+\item INT4 quantized: $30B \times 0.5$ bytes = 15GB
+\item KV cache (4K context): ~2-4GB additional
+\item Total with overhead (INT4): ~20-24GB
+\end{itemize}
 
-% TODO: Physical separation
-% - Dedicated GPUs per tenant
-% - Maximum isolation
-% - Enterprise tier
+\textbf{Recommended Hardware:} RTX 4090 (24GB) or A100 40GB
+\end{svgraybox}
 
 % =============================================================================
-\section{Tenant Data Model}
-\label{sec:tenant-model}
+\section{KV Cache Management}
+\label{sec:kv-cache}
 % =============================================================================
 
-\begin{programcode}{Tenant Data Model}
-\begin{lstlisting}[language=Go]
-// internal/tenant/models.go
+% TODO: Deep dive into KV cache
 
-type Tenant struct {
-    ID            string    `json:"id"`
-    Name          string    `json:"name"`
-    Tier          TenantTier `json:"tier"`
-    Status        TenantStatus `json:"status"`
-    Settings      TenantSettings `json:"settings"`
-    ResourceQuota ResourceQuota `json:"resource_quota"`
-    CreatedAt     time.Time `json:"created_at"`
-}
+\subsection{Understanding KV Cache}
+\label{subsec:kv-cache-understanding}
 
-type TenantTier string
+% TODO: What is KV cache
+% - Keys and values from attention
+% - Why it grows with context
+% - Memory formula
 
-const (
-    TierFree       TenantTier = "free"
-    TierStarter    TenantTier = "starter"
-    TierPro        TenantTier = "pro"
-    TierEnterprise TenantTier = "enterprise"
-)
+\subsection{KV Cache Optimization Techniques}
+\label{subsec:kv-optimization}
 
-type TenantSettings struct {
-    AllowedModels     []string `json:"allowed_models"`
-    MaxContextLength  int      `json:"max_context_length"`
-    CustomEndpoint    bool     `json:"custom_endpoint"`
-    DataRetention     int      `json:"data_retention_days"`
-    IsolationLevel    string   `json:"isolation_level"`
-}
+% TODO: Optimization strategies
+% - Paged attention (vLLM)
+% - KV cache compression
+% - Sliding window attention
 
-type ResourceQuota struct {
-    RequestsPerMinute   int   `json:"requests_per_minute"`
-    TokensPerMonth      int64 `json:"tokens_per_month"`
-    MaxConcurrent       int   `json:"max_concurrent"`
-    DedicatedGPUs       int   `json:"dedicated_gpus"`
-}
+\subsection{Context Length Trade-offs}
+\label{subsec:context-tradeoffs}
+
+% TODO: Balancing context and throughput
+% - Memory vs context
+% - Truncation strategies
+% - Multi-turn compression
+
+% =============================================================================
+\section{Batching Strategies}
+\label{sec:batching}
+% =============================================================================
+
+% TODO: Efficient batching
+
+\subsection{Static Batching}
+\label{subsec:static-batching}
+
+% TODO: Fixed batch sizes
+% - Simple to implement
+% - Inefficient for variable lengths
+
+\subsection{Dynamic Batching}
+\label{subsec:dynamic-batching}
+
+% TODO: Variable batch sizes
+% - Padding considerations
+% - Timeout-based batching
+
+\subsection{Continuous Batching}
+\label{subsec:continuous-batching}
+
+% TODO: vLLM's approach
+% - How it works
+% - Throughput benefits
+% - Implementation considerations
+
+% =============================================================================
+\section{vLLM Optimization}
+\label{sec:vllm-optimization}
+% =============================================================================
+
+% TODO: vLLM-specific tuning
+
+\subsection{Key Parameters}
+\label{subsec:vllm-parameters}
+
+\begin{programcode}{vLLM Configuration}
+\begin{lstlisting}[language=bash]
+# Optimized vLLM launch for 30B model
+python -m vllm.entrypoints.openai.api_server \
+    --model meta-llama/Llama-3.1-30B-Instruct \
+    --dtype float16 \
+    --tensor-parallel-size 1 \
+    --max-model-len 4096 \
+    --gpu-memory-utilization 0.90 \
+    --max-num-batched-tokens 4096 \
+    --max-num-seqs 128 \
+    --block-size 16 \
+    --swap-space 4 \
+    --enable-prefix-caching
+
+# Key parameters explained:
+# --gpu-memory-utilization: Use 90% of VRAM
+# --max-model-len: Maximum context length
+# --max-num-seqs: Maximum concurrent sequences
+# --block-size: KV cache block size
+# --swap-space: CPU swap space in GB
+# --enable-prefix-caching: Cache common prefixes
 \end{lstlisting}
 \end{programcode}
 
-% =============================================================================
-\section{Request Context}
-\label{sec:request-context}
-% =============================================================================
+\subsection{Memory Utilization}
+\label{subsec:memory-utilization}
 
-% TODO: Propagating tenant info
-% - Tenant in context
-% - Throughout request lifecycle
+% TODO: Balancing memory
+% - Model weights
+% - KV cache allocation
+% - Emergency headroom
 
-% =============================================================================
-\section{Resource Allocation}
-\label{sec:resource-allocation}
-% =============================================================================
+\subsection{Prefix Caching}
+\label{subsec:prefix-caching}
 
-% TODO: Fair sharing
-
-\subsection{Shared Pool Model}
-\label{subsec:shared-pool}
-
-% TODO: Default approach
-
-\subsection{Reserved Capacity}
-\label{subsec:reserved-capacity}
-
-% TODO: Guaranteed minimums
-
-\subsection{Dynamic Allocation}
-\label{subsec:dynamic-allocation}
-
-% TODO: Based on demand
+% TODO: System prompt caching
+% - What it caches
+% - Memory savings
+% - Configuration
 
 % =============================================================================
-\section{Noisy Neighbor Prevention}
-\label{sec:noisy-neighbor}
+\section{Multi-Model Serving}
+\label{sec:multi-model}
 % =============================================================================
 
-% TODO: Preventing one tenant from affecting others
-% - Rate limiting per tenant
-% - Resource limits
-% - Queue isolation
+% TODO: Serving multiple models
+
+\subsection{Model Loading Strategies}
+\label{subsec:model-loading}
+
+% TODO: How to manage multiple models
+% - Always loaded
+% - On-demand loading
+% - LRU eviction
+
+\subsection{Memory Sharing}
+\label{subsec:memory-sharing}
+
+% TODO: Sharing between models
+% - Base model sharing (LoRA)
+% - Dynamic adapter loading
+
+% =============================================================================
+\section{Profiling and Debugging}
+\label{sec:profiling}
+% =============================================================================
+
+% TODO: Finding bottlenecks
+
+\subsection{GPU Profiling}
+\label{subsec:gpu-profiling}
+
+% TODO: Tools and techniques
+% - nvidia-smi
+% - Nsight Systems
+% - PyTorch profiler
+
+\subsection{Identifying Bottlenecks}
+\label{subsec:bottlenecks}
+
+% TODO: Common bottlenecks
+% - Memory bandwidth
+% - KV cache
+% - Tokenization
+% - Network I/O
+
+% =============================================================================
+\section{Benchmarking}
+\label{sec:benchmarking}
+% =============================================================================
+
+% TODO: Measuring performance
+
+\subsection{Key Metrics}
+\label{subsec:benchmark-metrics}
+
+% TODO: What to measure
+% - Throughput (tokens/sec)
+% - Latency (TTFT, TBT)
+% - Memory usage
+% - Cost per token
+
+\subsection{Benchmark Methodology}
+\label{subsec:benchmark-methodology}
+
+% TODO: How to benchmark fairly
+% - Consistent prompts
+% - Warm-up period
+% - Multiple runs
+% - Statistical significance
+
+% =============================================================================
+\section{Control Plane v0.2}
+\label{sec:cpv02}
+% =============================================================================
+
+% TODO: Summary of v0.2 features
+% - Authentication
+% - Rate limiting
+% - Caching
+% - Queuing
+% - Multi-model routing
 
 % =============================================================================
 \section{Summary}
-\label{sec:ch11-summary}
+\label{sec:ch10-summary}
 % =============================================================================
 
 \begin{important}{Key Takeaways}
 \begin{itemize}
-\item Multi-tenancy enables efficient resource sharing
-\item Isolation level should match tenant tier
-\item Noisy neighbor problems require proactive prevention
-\item Tenant context must flow through the entire request
+\item 30B models require careful memory management
+\item KV cache grows with context length and batch size
+\item Continuous batching dramatically improves throughput
+\item vLLM's paged attention enables efficient memory use
+\item Profiling is essential for identifying bottlenecks
+\item Control Plane v0.2 is now production-ready
 \end{itemize}
 \end{important}
 
+\begin{svgraybox}
+\textbf{Part II Complete!}
+
+You now have a production-ready control plane (v0.2) with:
+\begin{itemize}
+\item Authentication and API key management
+\item Rate limiting with per-tier quotas
+\item Response caching (exact and semantic)
+\item Priority queue with load shedding
+\item Optimized 30B model serving
+\end{itemize}
+
+In Part III, we'll scale to multi-tenant with 70B models, adding tenant isolation, billing, and distributed inference.
+\end{svgraybox}
+
+% =============================================================================
 \section*{Problems}
 \addcontentsline{toc}{section}{Problems}
+% =============================================================================
 
 \begin{prob}
-\label{prob:ch11-tenant-service}
-Implement a \texttt{TenantService} that manages tenant lifecycle including creation, updates, and suspension.
+\label{prob:ch10-memory-calc}
+\textbf{Memory Calculation}\\
+Calculate the total VRAM required to serve a 30B model with INT4 quantization, 8K context length, and batch size of 16. Include KV cache and overhead.
 \end{prob}
 
-\input{chapters/references11}
+\begin{prob}
+\label{prob:ch10-benchmark}
+\textbf{Performance Benchmark}\\
+Benchmark a 30B model with different batch sizes (1, 4, 16, 32). Graph throughput vs latency and find the optimal batch size for your use case.
+\end{prob}
+
+\begin{prob}
+\label{prob:ch10-multi-model}
+\textbf{Multi-Model Router}\\
+Implement a router that serves multiple models (7B, 13B, 30B) from a single endpoint. Include automatic model selection based on request complexity and user tier.
+\end{prob}
+
+\input{chapters/references10}

@@ -1,188 +1,140 @@
-%%%%%%%%%%%%%%%%%%%%% chapter18.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%% chapter17.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% Chapter 18: Production Operations and Control Plane v1.0
+% Chapter 17: Building CodeLab - A Commercial AI Coding Assistant
 %
 %%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Production Operations and Control Plane v1.0}
-\label{ch:operations}
+\chapter{Building CodeLab: A Commercial AI Coding Assistant}
+\label{ch:codelab}
 
-\abstract*{The final chapter covers production operations at scale: advanced monitoring, automated incident response, capacity planning, and the complete Control Plane v1.0. We discuss reliability engineering practices for AI infrastructure and provide a comprehensive operational playbook.}
+\abstract*{This capstone chapter brings everything together to build CodeLab, a commercial-grade AI coding assistant. We cover the complete product architecture, IDE integration (VS Code, JetBrains), code completion and chat interfaces, context management, and productization. By the end, you'll have a working Copilot alternative running on your infrastructure.}
 
-\abstract{The final chapter covers production operations at scale: advanced monitoring, automated incident response, capacity planning, and the complete Control Plane v1.0. We discuss reliability engineering practices for AI infrastructure and provide a comprehensive operational playbook.}
-
-% =============================================================================
-\section{Control Plane v1.0 Overview}
-\label{sec:cpv10-overview}
-% =============================================================================
-
-% TODO: Complete feature set
-% - All features from v0.1-v0.3
-% - Production hardening
-% - Enterprise features
-
-\begin{svgraybox}
-\textbf{Control Plane v1.0 Features:}
-
-\textbf{From v0.1 (Foundations):}
-\begin{itemize}
-\item Backend abstraction
-\item Health checks
-\item Prometheus metrics
-\end{itemize}
-
-\textbf{From v0.2 (Production):}
-\begin{itemize}
-\item Authentication
-\item Rate limiting
-\item Caching
-\item Request queue
-\end{itemize}
-
-\textbf{From v0.3 (Multi-Tenant):}
-\begin{itemize}
-\item Tenant isolation
-\item Billing integration
-\item Distributed inference
-\item Model routing
-\end{itemize}
-
-\textbf{New in v1.0:}
-\begin{itemize}
-\item Distributed tracing
-\item Automated failover
-\item Capacity planning
-\item Cost optimization
-\end{itemize}
-\end{svgraybox}
+\abstract{This capstone chapter brings everything together to build CodeLab, a commercial-grade AI coding assistant. We cover the complete product architecture, IDE integration (VS Code, JetBrains), code completion and chat interfaces, context management, and productization. By the end, you'll have a working Copilot alternative running on your infrastructure.}
 
 % =============================================================================
-\section{Advanced Observability}
-\label{sec:advanced-observability}
+\section{CodeLab Architecture}
+\label{sec:codelab-architecture}
 % =============================================================================
 
-% TODO: Beyond basic metrics
-% - Distributed tracing
-% - Log aggregation
-% - Anomaly detection
-
-\subsection{Distributed Tracing}
-\label{subsec:tracing}
-
-% TODO: Request tracing
-% - OpenTelemetry
-% - Jaeger/Zipkin
-
-\subsection{SLOs and SLIs}
-\label{subsec:slo-sli}
-
-% TODO: Service level objectives
-% - Defining SLOs
-% - Measuring SLIs
-% - Error budgets
+% TODO: Overall architecture
+% - IDE extensions
+% - Gateway service
+% - Control plane
+% - Model backends
 
 % =============================================================================
-\section{Incident Management}
-\label{sec:incident-management}
+\section{Code Completion API}
+\label{sec:code-completion}
 % =============================================================================
 
-% TODO: When things go wrong
-% - Detection
-% - Response
-% - Recovery
-% - Post-mortem
+% TODO: Completion interface
+% - FIM (Fill-in-the-Middle)
+% - Context gathering
+% - Streaming responses
+
+\begin{programcode}{Code Completion API}
+\begin{lstlisting}[language=Go]
+// internal/codelab/completion.go
+
+type CompletionRequest struct {
+    Prefix      string `json:"prefix"`      // Code before cursor
+    Suffix      string `json:"suffix"`      // Code after cursor
+    Language    string `json:"language"`
+    FilePath    string `json:"file_path"`
+    MaxTokens   int    `json:"max_tokens"`
+}
+
+type CompletionResponse struct {
+    Completions []Completion `json:"completions"`
+}
+
+type Completion struct {
+    Text       string  `json:"text"`
+    Confidence float64 `json:"confidence"`
+}
+\end{lstlisting}
+\end{programcode}
 
 % =============================================================================
-\section{Capacity Planning}
-\label{sec:capacity-planning}
+\section{Chat Interface}
+\label{sec:chat-interface}
 % =============================================================================
 
-% TODO: Planning for growth
-% - Traffic forecasting
-% - Hardware procurement
-% - Scaling triggers
+% TODO: Code-aware chat
+% - File context
+% - Repository context
+% - Action suggestions
 
 % =============================================================================
-\section{Automated Operations}
-\label{sec:automation}
+\section{Context Management}
+\label{sec:context-management}
 % =============================================================================
 
-% TODO: Reducing toil
-% - Auto-scaling
-% - Auto-recovery
-% - Deployment automation
+% TODO: Gathering context
+% - Current file
+% - Open files
+% - Related files
+% - Repository structure
+
+\subsection{RAG for Code}
+\label{subsec:code-rag}
+
+% TODO: Code embeddings
+% - Chunking strategies
+% - Retrieval
 
 % =============================================================================
-\section{Cost Optimization}
-\label{sec:cost-optimization}
+\section{VS Code Extension}
+\label{sec:vscode-extension}
 % =============================================================================
 
-% TODO: Managing costs at scale
-% - Utilization optimization
-% - Spot instances
-% - Model efficiency
+% TODO: Building the extension
+% - Extension structure
+% - Inline completions API
+% - Chat participant API
 
 % =============================================================================
-\section{Security Hardening}
-\label{sec:security-hardening}
+\section{JetBrains Plugin}
+\label{sec:jetbrains}
 % =============================================================================
 
-% TODO: Production security
-% - Network security
-% - Secrets management
-% - Audit logging
+% TODO: IntelliJ platform
+% - Plugin structure
+% - Completion provider
 
 % =============================================================================
-\section{Operational Playbook}
-\label{sec:playbook}
+\section{Model Selection for Code}
+\label{sec:code-models}
 % =============================================================================
 
-% TODO: Runbook compilation
-% - Deployment
-% - Scaling
-% - Incidents
-% - Maintenance
+% TODO: Best models for coding
+% - DeepSeek Coder
+% - CodeLlama
+% - Qwen Coder
+% - StarCoder
 
 % =============================================================================
-\section{Conclusion}
-\label{sec:conclusion}
+\section{Productization}
+\label{sec:productization}
 % =============================================================================
 
-% TODO: Book conclusion
-% - What you've built
-% - Where to go next
-% - The future of self-hosted AI
-
-\begin{svgraybox}
-\textbf{Congratulations!}
-
-You've built a complete AI inference platform, from a single 7B model on a laptop to a commercial 400B inference lab. Along the way, you've learned:
-
-\begin{itemize}
-\item How inference works at every scale
-\item Hardware selection and optimization
-\item Production infrastructure patterns
-\item Multi-tenant platform design
-\item Commercial product development
-\end{itemize}
-
-The control plane you've built is production-ready. The knowledge you've gained puts you at the forefront of AI infrastructure engineering.
-
-The future of AI is self-hosted. Go build it.
-\end{svgraybox}
+% TODO: Making it a product
+% - User onboarding
+% - Telemetry
+% - Feedback loop
+% - Pricing
 
 % =============================================================================
 \section{Summary}
-\label{sec:ch18-summary}
+\label{sec:ch17-summary}
 % =============================================================================
 
 \begin{important}{Key Takeaways}
 \begin{itemize}
-\item Control Plane v1.0 is production-complete
-\item Observability goes beyond basic metrics
-\item Automation reduces operational burden
-\item Security and reliability are non-negotiable
-\item You now have the skills to run world-class AI infrastructure
+\item CodeLab demonstrates a complete commercial AI product
+\item IDE integration requires understanding extension APIs
+\item Context management is crucial for code quality
+\item Specialized code models outperform general-purpose
 \end{itemize}
 \end{important}
 
@@ -190,13 +142,8 @@ The future of AI is self-hosted. Go build it.
 \addcontentsline{toc}{section}{Problems}
 
 \begin{prob}
-\label{prob:ch18-slo}
-Define SLOs for your inference platform including availability, latency, and error rate. Implement dashboards to track them.
+\label{prob:ch17-extension}
+Build a minimal VS Code extension that provides code completion using your control plane API.
 \end{prob}
 
-\begin{prob}
-\label{prob:ch18-runbook}
-Create a complete operational runbook for your deployment including procedures for deployment, scaling, and incident response.
-\end{prob}
-
-\input{chapters/references18}
+\input{chapters/references17}

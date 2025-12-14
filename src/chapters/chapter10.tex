@@ -1,273 +1,293 @@
-%%%%%%%%%%%%%%%%%%%%% chapter10.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%% chapter09.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% Chapter 10: 30B Model Optimization
+% Chapter 9: Request Queue and Priority Management
 %
 %%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{30B Model Optimization}
-\label{ch:30b-optimization}
+\chapter{Request Queue and Priority Management}
+\label{ch:queue}
 
-\abstract*{Moving from 7B to 30B models introduces new challenges. This chapter covers memory management at scale, KV cache optimization, batching strategies for throughput, vLLM tuning, and multi-model serving. We optimize our deployment to efficiently serve 30B models while maintaining acceptable latency.}
+\abstract*{When demand exceeds capacity, you need a queue. This chapter covers request queue design, priority levels, fairness algorithms, timeout handling, and queue-aware load shedding. We implement a priority queue system that ensures important requests get processed while preventing queue explosion during traffic spikes.}
 
-\abstract{Moving from 7B to 30B models introduces new challenges. This chapter covers memory management at scale, KV cache optimization, batching strategies for throughput, vLLM tuning, and multi-model serving. We optimize our deployment to efficiently serve 30B models while maintaining acceptable latency.}
-
-% =============================================================================
-\section{The 30B Challenge}
-\label{sec:30b-challenge}
-% =============================================================================
-
-% TODO: What changes at 30B
-% - Memory requirements
-% - Throughput considerations
-% - Hardware requirements
-
-\subsection{Memory Requirements}
-\label{subsec:30b-memory}
-
-% TODO: Calculate memory needs
-% - Model weights
-% - KV cache
-% - Activations
-% - Overhead
-
-\begin{svgraybox}
-\textbf{30B Model Memory Requirements:}
-
-\begin{itemize}
-\item FP16 weights: $30B \times 2$ bytes = 60GB
-\item INT8 quantized: $30B \times 1$ byte = 30GB
-\item INT4 quantized: $30B \times 0.5$ bytes = 15GB
-\item KV cache (4K context): ~2-4GB additional
-\item Total with overhead (INT4): ~20-24GB
-\end{itemize}
-
-\textbf{Recommended Hardware:} RTX 4090 (24GB) or A100 40GB
-\end{svgraybox}
+\abstract{When demand exceeds capacity, you need a queue. This chapter covers request queue design, priority levels, fairness algorithms, timeout handling, and queue-aware load shedding. We implement a priority queue system that ensures important requests get processed while preventing queue explosion during traffic spikes.}
 
 % =============================================================================
-\section{KV Cache Management}
-\label{sec:kv-cache}
+\section{Why Queue Requests?}
+\label{sec:why-queue}
 % =============================================================================
 
-% TODO: Deep dive into KV cache
-
-\subsection{Understanding KV Cache}
-\label{subsec:kv-cache-understanding}
-
-% TODO: What is KV cache
-% - Keys and values from attention
-% - Why it grows with context
-% - Memory formula
-
-\subsection{KV Cache Optimization Techniques}
-\label{subsec:kv-optimization}
-
-% TODO: Optimization strategies
-% - Paged attention (vLLM)
-% - KV cache compression
-% - Sliding window attention
-
-\subsection{Context Length Trade-offs}
-\label{subsec:context-tradeoffs}
-
-% TODO: Balancing context and throughput
-% - Memory vs context
-% - Truncation strategies
-% - Multi-turn compression
+% TODO: Motivation
+% - Traffic spikes
+% - GPU utilization optimization
+% - Fair resource allocation
+% - Graceful overload handling
 
 % =============================================================================
-\section{Batching Strategies}
-\label{sec:batching}
+\section{Queue Architecture}
+\label{sec:queue-architecture}
 % =============================================================================
 
-% TODO: Efficient batching
+% TODO: Design considerations
 
-\subsection{Static Batching}
-\label{subsec:static-batching}
+\subsection{In-Memory vs Distributed}
+\label{subsec:queue-types}
 
-% TODO: Fixed batch sizes
-% - Simple to implement
-% - Inefficient for variable lengths
+% TODO: Trade-offs
+% - In-memory: simple, fast, single node
+% - Distributed: Redis, RabbitMQ, etc.
 
-\subsection{Dynamic Batching}
-\label{subsec:dynamic-batching}
+\subsection{Priority Levels}
+\label{subsec:priority-levels}
 
-% TODO: Variable batch sizes
-% - Padding considerations
-% - Timeout-based batching
+% TODO: Defining priorities
+% - Enterprise (highest)
+% - Pro
+% - Free (lowest)
+% - System/internal
 
-\subsection{Continuous Batching}
-\label{subsec:continuous-batching}
+\begin{programcode}{Priority Queue Interface}
+\begin{lstlisting}[language=Go]
+// internal/queue/queue.go
 
-% TODO: vLLM's approach
-% - How it works
-% - Throughput benefits
-% - Implementation considerations
+package queue
 
-% =============================================================================
-\section{vLLM Optimization}
-\label{sec:vllm-optimization}
-% =============================================================================
+import (
+    "context"
+    "time"
+)
 
-% TODO: vLLM-specific tuning
+type Priority int
 
-\subsection{Key Parameters}
-\label{subsec:vllm-parameters}
+const (
+    PriorityLow Priority = iota
+    PriorityNormal
+    PriorityHigh
+    PriorityCritical
+)
 
-\begin{programcode}{vLLM Configuration}
-\begin{lstlisting}[language=bash]
-# Optimized vLLM launch for 30B model
-python -m vllm.entrypoints.openai.api_server \
-    --model meta-llama/Llama-3.1-30B-Instruct \
-    --dtype float16 \
-    --tensor-parallel-size 1 \
-    --max-model-len 4096 \
-    --gpu-memory-utilization 0.90 \
-    --max-num-batched-tokens 4096 \
-    --max-num-seqs 128 \
-    --block-size 16 \
-    --swap-space 4 \
-    --enable-prefix-caching
+type QueuedRequest struct {
+    ID          string
+    UserID      string
+    Priority    Priority
+    Request     backend.GenerateRequest
+    EnqueuedAt  time.Time
+    Deadline    time.Time
+    ResultChan  chan QueueResult
+}
 
-# Key parameters explained:
-# --gpu-memory-utilization: Use 90% of VRAM
-# --max-model-len: Maximum context length
-# --max-num-seqs: Maximum concurrent sequences
-# --block-size: KV cache block size
-# --swap-space: CPU swap space in GB
-# --enable-prefix-caching: Cache common prefixes
+type QueueResult struct {
+    Response backend.GenerateResponse
+    Error    error
+    WaitTime time.Duration
+}
+
+type RequestQueue interface {
+    // Enqueue adds a request to the queue
+    Enqueue(ctx context.Context, req QueuedRequest) error
+
+    // Dequeue gets the next request to process
+    Dequeue(ctx context.Context) (*QueuedRequest, error)
+
+    // Size returns current queue length by priority
+    Size(ctx context.Context) map[Priority]int
+
+    // Stats returns queue statistics
+    Stats(ctx context.Context) QueueStats
+}
+
+type QueueStats struct {
+    TotalEnqueued   int64
+    TotalProcessed  int64
+    TotalTimeout    int64
+    AverageWaitTime time.Duration
+    CurrentDepth    int
+}
 \end{lstlisting}
 \end{programcode}
 
-\subsection{Memory Utilization}
-\label{subsec:memory-utilization}
-
-% TODO: Balancing memory
-% - Model weights
-% - KV cache allocation
-% - Emergency headroom
-
-\subsection{Prefix Caching}
-\label{subsec:prefix-caching}
-
-% TODO: System prompt caching
-% - What it caches
-% - Memory savings
-% - Configuration
-
 % =============================================================================
-\section{Multi-Model Serving}
-\label{sec:multi-model}
+\section{Implementing Priority Queue}
+\label{sec:priority-queue-impl}
 % =============================================================================
 
-% TODO: Serving multiple models
+% TODO: Implementation
 
-\subsection{Model Loading Strategies}
-\label{subsec:model-loading}
+\subsection{Heap-Based Priority Queue}
+\label{subsec:heap-queue}
 
-% TODO: How to manage multiple models
-% - Always loaded
-% - On-demand loading
-% - LRU eviction
+% TODO: Using container/heap
+% - Standard library approach
+% - Efficient O(log n) operations
 
-\subsection{Memory Sharing}
-\label{subsec:memory-sharing}
+\subsection{Multiple Queue Approach}
+\label{subsec:multi-queue}
 
-% TODO: Sharing between models
-% - Base model sharing (LoRA)
-% - Dynamic adapter loading
-
-% =============================================================================
-\section{Profiling and Debugging}
-\label{sec:profiling}
-% =============================================================================
-
-% TODO: Finding bottlenecks
-
-\subsection{GPU Profiling}
-\label{subsec:gpu-profiling}
-
-% TODO: Tools and techniques
-% - nvidia-smi
-% - Nsight Systems
-% - PyTorch profiler
-
-\subsection{Identifying Bottlenecks}
-\label{subsec:bottlenecks}
-
-% TODO: Common bottlenecks
-% - Memory bandwidth
-% - KV cache
-% - Tokenization
-% - Network I/O
+% TODO: Separate queues per priority
+% - Simple round-robin
+% - Weighted fair queueing
 
 % =============================================================================
-\section{Benchmarking}
-\label{sec:benchmarking}
+\section{Fairness Algorithms}
+\label{sec:fairness}
 % =============================================================================
 
-% TODO: Measuring performance
+% TODO: Preventing starvation
 
-\subsection{Key Metrics}
-\label{subsec:benchmark-metrics}
+\subsection{Weighted Fair Queueing}
+\label{subsec:wfq}
 
-% TODO: What to measure
-% - Throughput (tokens/sec)
-% - Latency (TTFT, TBT)
-% - Memory usage
-% - Cost per token
+% TODO: WFQ explained
+% - Weights per priority
+% - Preventing low-priority starvation
 
-\subsection{Benchmark Methodology}
-\label{subsec:benchmark-methodology}
+\subsection{Deficit Round Robin}
+\label{subsec:drr}
 
-% TODO: How to benchmark fairly
-% - Consistent prompts
-% - Warm-up period
-% - Multiple runs
-% - Statistical significance
+% TODO: DRR for simplicity
+% - How it works
+% - Implementation
 
 % =============================================================================
-\section{Control Plane v0.2}
-\label{sec:cpv02}
+\section{Timeout Handling}
+\label{sec:timeout-handling}
 % =============================================================================
 
-% TODO: Summary of v0.2 features
-% - Authentication
-% - Rate limiting
-% - Caching
-% - Queuing
-% - Multi-model routing
+% TODO: Managing deadlines
+
+\subsection{Queue Timeout}
+\label{subsec:queue-timeout}
+
+% TODO: Max time in queue
+% - Per-priority timeouts
+% - Removing stale requests
+
+\subsection{Processing Timeout}
+\label{subsec:processing-timeout}
+
+% TODO: Max inference time
+% - Context cancellation
+% - Resource cleanup
+
+% =============================================================================
+\section{Load Shedding}
+\label{sec:load-shedding}
+% =============================================================================
+
+% TODO: When queue gets too long
+
+\subsection{Queue Limits}
+\label{subsec:queue-limits}
+
+% TODO: Max queue depth
+% - Per-priority limits
+% - System-wide limits
+
+\subsection{Graceful Rejection}
+\label{subsec:graceful-rejection}
+
+% TODO: How to reject
+% - 503 Service Unavailable
+% - Retry-After header
+% - Queue position estimation
+
+\begin{programcode}{Load Shedding Configuration}
+\begin{lstlisting}[language=Go]
+// internal/queue/config.go
+
+type QueueConfig struct {
+    // Maximum queue depth per priority
+    MaxDepth map[Priority]int `yaml:"max_depth"`
+
+    // Maximum wait time in queue
+    MaxWaitTime map[Priority]time.Duration `yaml:"max_wait_time"`
+
+    // Processing timeout
+    ProcessingTimeout time.Duration `yaml:"processing_timeout"`
+
+    // Weights for fair queueing (higher = more service)
+    Weights map[Priority]int `yaml:"weights"`
+}
+
+var DefaultQueueConfig = QueueConfig{
+    MaxDepth: map[Priority]int{
+        PriorityLow:      100,
+        PriorityNormal:   500,
+        PriorityHigh:     1000,
+        PriorityCritical: 5000,
+    },
+    MaxWaitTime: map[Priority]time.Duration{
+        PriorityLow:      30 * time.Second,
+        PriorityNormal:   60 * time.Second,
+        PriorityHigh:     120 * time.Second,
+        PriorityCritical: 300 * time.Second,
+    },
+    ProcessingTimeout: 5 * time.Minute,
+    Weights: map[Priority]int{
+        PriorityLow:      1,
+        PriorityNormal:   3,
+        PriorityHigh:     10,
+        PriorityCritical: 50,
+    },
+}
+\end{lstlisting}
+\end{programcode}
+
+% =============================================================================
+\section{Worker Pool}
+\label{sec:worker-pool}
+% =============================================================================
+
+% TODO: Processing requests from queue
+
+\subsection{Worker Design}
+\label{subsec:worker-design}
+
+% TODO: Worker goroutines
+% - Pool size configuration
+% - Graceful shutdown
+
+\subsection{Scaling Workers}
+\label{subsec:scaling-workers}
+
+% TODO: Dynamic scaling
+% - Based on queue depth
+% - Based on GPU utilization
+
+% =============================================================================
+\section{Metrics and Visibility}
+\label{sec:queue-metrics}
+% =============================================================================
+
+% TODO: What to track
+% - Queue depth
+% - Wait time percentiles
+% - Rejection rate
+% - Timeout rate
+
+% =============================================================================
+\section{Integration with Control Plane}
+\label{sec:queue-integration}
+% =============================================================================
+
+% TODO: Wiring it together
+% - Synchronous vs async API
+% - Webhook callbacks
+% - Polling endpoints
 
 % =============================================================================
 \section{Summary}
-\label{sec:ch10-summary}
+\label{sec:ch09-summary}
 % =============================================================================
 
 \begin{important}{Key Takeaways}
 \begin{itemize}
-\item 30B models require careful memory management
-\item KV cache grows with context length and batch size
-\item Continuous batching dramatically improves throughput
-\item vLLM's paged attention enables efficient memory use
-\item Profiling is essential for identifying bottlenecks
-\item Control Plane v0.2 is now production-ready
+\item Queues enable graceful handling of traffic spikes
+\item Priority levels ensure important requests get served first
+\item Fairness algorithms prevent starvation of lower priorities
+\item Load shedding protects the system from overload
+\item Clear visibility into queue state is essential
 \end{itemize}
 \end{important}
-
-\begin{svgraybox}
-\textbf{Part II Complete!}
-
-You now have a production-ready control plane (v0.2) with:
-\begin{itemize}
-\item Authentication and API key management
-\item Rate limiting with per-tier quotas
-\item Response caching (exact and semantic)
-\item Priority queue with load shedding
-\item Optimized 30B model serving
-\end{itemize}
-
-In Part III, we'll scale to multi-tenant with 70B models, adding tenant isolation, billing, and distributed inference.
-\end{svgraybox}
 
 % =============================================================================
 \section*{Problems}
@@ -275,21 +295,21 @@ In Part III, we'll scale to multi-tenant with 70B models, adding tenant isolatio
 % =============================================================================
 
 \begin{prob}
-\label{prob:ch10-memory-calc}
-\textbf{Memory Calculation}\\
-Calculate the total VRAM required to serve a 30B model with INT4 quantization, 8K context length, and batch size of 16. Include KV cache and overhead.
+\label{prob:ch09-priority-queue}
+\textbf{Priority Queue Implementation}\\
+Implement a priority queue using Go's container/heap package. Support multiple priority levels with configurable weights.
 \end{prob}
 
 \begin{prob}
-\label{prob:ch10-benchmark}
-\textbf{Performance Benchmark}\\
-Benchmark a 30B model with different batch sizes (1, 4, 16, 32). Graph throughput vs latency and find the optimal batch size for your use case.
+\label{prob:ch09-worker-pool}
+\textbf{Worker Pool}\\
+Build a worker pool that processes requests from the priority queue. Include graceful shutdown and dynamic scaling based on queue depth.
 \end{prob}
 
 \begin{prob}
-\label{prob:ch10-multi-model}
-\textbf{Multi-Model Router}\\
-Implement a router that serves multiple models (7B, 13B, 30B) from a single endpoint. Include automatic model selection based on request complexity and user tier.
+\label{prob:ch09-load-test}
+\textbf{Load Testing}\\
+Create a load testing tool that generates traffic at various rates. Measure queue behavior under normal load, overload, and spike scenarios.
 \end{prob}
 
-\input{chapters/references10}
+\input{chapters/references09}

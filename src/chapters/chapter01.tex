@@ -97,7 +97,7 @@ The resource profile differs substantially from training:
 \item \textbf{Data}: A single prompt, not terabytes of training data.
 \end{itemize}
 
-The KV cache deserves attention because it's often the limiting factor for long-context inference. During generation, the model caches intermediate computations (keys and values from the attention mechanism) to avoid redundant work. For a 7B model with a 4096-token context, the KV cache consumes approximately 1GB of memory at FP16 precision. At 128K context length, that grows to roughly 32GB---potentially exceeding the model weights themselves. Chapter~\ref{ch:hardware} covers memory calculations in detail.
+The KV cache deserves attention because it's often the limiting factor for long-context inference. During generation, the model caches intermediate computations (keys and values from the attention mechanism) to avoid redundant work. For a 7B model with a 4096-token context, the KV cache consumes approximately 1GB of memory at FP16 precision. At 128K context length, that grows to roughly 32GB---potentially exceeding the model weights themselves. Chapter~\ref{ch:hardware-fundamentals} covers memory calculations in detail.
 
 \begin{figure}[htbp]
 \centering
@@ -197,7 +197,7 @@ Self-hosted costs work differently. The primary expenses are:
 \item \textbf{Maintenance}: Minimal for small deployments; significant for multi-GPU clusters.
 \end{itemize}
 
-The break-even calculation depends on utilization. A \$2,000 GPU investment pays for itself in 1--2 months if you're replacing \$1,500/month in API costs. If your usage is sporadic---a few hundred requests per day---APIs may remain more economical. Chapter~\ref{ch:hardware} provides detailed cost models for different deployment scales.
+The break-even calculation depends on utilization. A \$2,000 GPU investment pays for itself in 1--2 months if you're replacing \$1,500/month in API costs. If your usage is sporadic---a few hundred requests per day---APIs may remain more economical. Chapter~\ref{ch:hardware-fundamentals} provides detailed cost models for different deployment scales.
 
 \subsection{Privacy and Data Sovereignty}
 \label{subsec:privacy}
@@ -228,7 +228,7 @@ When you control the inference stack, you control placement. Deploy in the same 
 
 Consistency is equally important. Managed APIs serve many customers on shared infrastructure. During peak demand, you compete for resources with other users, leading to variable response times. Your P99 latency might be 3x your median latency. With dedicated infrastructure---whether a reserved cloud instance or on-premise hardware---your latency distribution tightens because you're not sharing resources.
 
-The performance trade-off depends on model size and hardware. A 7B model on a mid-range GPU delivers 30--50 tokens per second with time-to-first-token under 100ms. That's competitive with managed APIs for most workloads. Larger models on slower hardware may underperform managed services that run on cutting-edge GPUs with aggressive optimization. Chapter~\ref{ch:hardware} helps you match hardware to performance requirements.
+The performance trade-off depends on model size and hardware. A 7B model on a mid-range GPU delivers 30--50 tokens per second with time-to-first-token under 100ms. That's competitive with managed APIs for most workloads. Larger models on slower hardware may underperform managed services that run on cutting-edge GPUs with aggressive optimization. Chapter~\ref{ch:hardware-fundamentals} helps you match hardware to performance requirements.
 
 \subsection{Customization and Control}
 \label{subsec:customization}
@@ -258,7 +258,7 @@ Self-hosting isn't always the right choice. Managed APIs win in several scenario
 \item \textbf{Limited engineering capacity}: Running inference infrastructure requires systems engineering skills---debugging GPU memory issues, optimizing throughput, maintaining uptime. If your team lacks this expertise and can't acquire it, the learning curve may not justify the benefits.
 \end{itemize}
 
-The decision isn't binary. Many organizations use managed APIs for experimentation and frontier capabilities while self-hosting for high-volume production workloads with stable requirements. Chapter~\ref{ch:hardware} includes a decision framework for evaluating which workloads to self-host.
+The decision isn't binary. Many organizations use managed APIs for experimentation and frontier capabilities while self-hosting for high-volume production workloads with stable requirements. Chapter~\ref{ch:hardware-fundamentals} includes a decision framework for evaluating which workloads to self-host.
 
 % =============================================================================
 \section{What You'll Build in This Book}
@@ -488,7 +488,7 @@ Two latency metrics matter for interactive applications:
 \item[Inter-Token Latency (ITL)] Average time between generated tokens. With 80 tokens in 1.78 seconds, ITL is approximately 15ms. Lower ITL means smoother streaming.
 \end{description}
 
-Hardware dramatically affects these numbers. The same Qwen 2.5 7B model might achieve 20 tok/s on CPU, 75 tok/s on an RTX 4060, and 150 tok/s on an RTX 4090. Chapter~\ref{ch:hardware} provides benchmarks across GPU tiers.
+Hardware dramatically affects these numbers. The same Qwen 2.5 7B model might achieve 20 tok/s on CPU, 75 tok/s on an RTX 4060, and 150 tok/s on an RTX 4090. Chapter~\ref{ch:hardware-fundamentals} provides benchmarks across GPU tiers.
 
 \subsection{Generation Parameters}
 \label{subsec:generation-params}
@@ -524,9 +524,11 @@ Most importantly, you've run your first model. Qwen 2.5 7B is now responding to 
 \end{itemize}
 \end{important}
 
-\subsection*{Next: Hardware}
+\subsection*{Next: How LLMs Work}
 
-Chapter~\ref{ch:hardware} answers the question you're likely asking: what hardware do I actually need? We'll calculate memory requirements for different model sizes, compare GPU tiers and their price-performance ratios, and help you choose infrastructure that matches your workload. You'll learn why a 7B model fits in 4GB but a 70B model needs 40GB---and what quantization has to do with it.
+Before diving into hardware requirements, Chapter~\ref{ch:how-llms-work} explains what's actually happening inside these models. You'll understand the transformer architecture from a systems perspective---not the math, but the components and data flow that determine memory usage and performance. We'll trace the inference lifecycle from prompt to response, and most importantly, you'll learn why KV cache exists and how it affects everything from memory requirements to context length limits.
+
+Then Chapter~\ref{ch:hardware-fundamentals} answers the question you're likely asking: what hardware do I actually need? We'll calculate memory requirements for different model sizes, compare GPU tiers and their price-performance ratios, and help you choose infrastructure that matches your workload.
 
 % =============================================================================
 \section*{Problems}

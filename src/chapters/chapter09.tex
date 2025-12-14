@@ -1,291 +1,265 @@
-%%%%%%%%%%%%%%%%%%%%% chapter09.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%% chapter08.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% Chapter 9: Request Queue and Priority Management
+% Chapter 8: Response Caching
 %
 %%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Request Queue and Priority Management}
-\label{ch:queue}
+\chapter{Response Caching}
+\label{ch:caching}
 
-\abstract*{When demand exceeds capacity, you need a queue. This chapter covers request queue design, priority levels, fairness algorithms, timeout handling, and queue-aware load shedding. We implement a priority queue system that ensures important requests get processed while preventing queue explosion during traffic spikes.}
+\abstract*{Inference is expensive. Smart caching can dramatically reduce costs for repeated or similar queries. This chapter covers exact match caching, semantic caching with embeddings, cache invalidation strategies, and cache-aware routing. We implement a caching layer that integrates with the control plane while respecting the non-deterministic nature of LLM outputs.}
 
-\abstract{When demand exceeds capacity, you need a queue. This chapter covers request queue design, priority levels, fairness algorithms, timeout handling, and queue-aware load shedding. We implement a priority queue system that ensures important requests get processed while preventing queue explosion during traffic spikes.}
-
-% =============================================================================
-\section{Why Queue Requests?}
-\label{sec:why-queue}
-% =============================================================================
-
-% TODO: Motivation
-% - Traffic spikes
-% - GPU utilization optimization
-% - Fair resource allocation
-% - Graceful overload handling
+\abstract{Inference is expensive. Smart caching can dramatically reduce costs for repeated or similar queries. This chapter covers exact match caching, semantic caching with embeddings, cache invalidation strategies, and cache-aware routing. We implement a caching layer that integrates with the control plane while respecting the non-deterministic nature of LLM outputs.}
 
 % =============================================================================
-\section{Queue Architecture}
-\label{sec:queue-architecture}
+\section{The Case for Caching}
+\label{sec:caching-case}
 % =============================================================================
 
-% TODO: Design considerations
+% TODO: Why cache inference results
+% - Inference is expensive
+% - Many queries repeat
+% - Latency improvement
+% - Cost reduction
 
-\subsection{In-Memory vs Distributed}
-\label{subsec:queue-types}
+\subsection{When Caching Makes Sense}
+\label{subsec:when-caching}
 
-% TODO: Trade-offs
-% - In-memory: simple, fast, single node
-% - Distributed: Redis, RabbitMQ, etc.
+% TODO: Good candidates
+% - FAQ-style queries
+% - Code documentation
+% - Product descriptions
+% - Classification tasks
 
-\subsection{Priority Levels}
-\label{subsec:priority-levels}
+\subsection{When Caching Doesn't Work}
+\label{subsec:when-not-caching}
 
-% TODO: Defining priorities
-% - Enterprise (highest)
-% - Pro
-% - Free (lowest)
-% - System/internal
+% TODO: Poor candidates
+% - Creative writing (uniqueness valued)
+% - Time-sensitive queries
+% - Personalized responses
+% - Low repeat rate
 
-\begin{programcode}{Priority Queue Interface}
+% =============================================================================
+\section{Exact Match Caching}
+\label{sec:exact-caching}
+% =============================================================================
+
+% TODO: Simple exact match
+
+\subsection{Cache Key Design}
+\label{subsec:cache-key-design}
+
+% TODO: What goes in the key
+% - Prompt
+% - Model
+% - Temperature (if 0)
+% - System prompt
+
+\begin{programcode}{Cache Key Generation}
 \begin{lstlisting}[language=Go]
-// internal/queue/queue.go
+// internal/cache/key.go
 
-package queue
+package cache
 
 import (
-    "context"
-    "time"
+    "crypto/sha256"
+    "encoding/hex"
+    "encoding/json"
 )
 
-type Priority int
-
-const (
-    PriorityLow Priority = iota
-    PriorityNormal
-    PriorityHigh
-    PriorityCritical
-)
-
-type QueuedRequest struct {
-    ID          string
-    UserID      string
-    Priority    Priority
-    Request     backend.GenerateRequest
-    EnqueuedAt  time.Time
-    Deadline    time.Time
-    ResultChan  chan QueueResult
+type CacheKey struct {
+    Model       string  `json:"model"`
+    Prompt      string  `json:"prompt"`
+    SystemPrompt string `json:"system_prompt,omitempty"`
+    Temperature float64 `json:"temperature"`
+    MaxTokens   int     `json:"max_tokens"`
 }
 
-type QueueResult struct {
-    Response backend.GenerateResponse
-    Error    error
-    WaitTime time.Duration
+func (k CacheKey) Hash() string {
+    data, _ := json.Marshal(k)
+    hash := sha256.Sum256(data)
+    return hex.EncodeToString(hash[:])
 }
 
-type RequestQueue interface {
-    // Enqueue adds a request to the queue
-    Enqueue(ctx context.Context, req QueuedRequest) error
-
-    // Dequeue gets the next request to process
-    Dequeue(ctx context.Context) (*QueuedRequest, error)
-
-    // Size returns current queue length by priority
-    Size(ctx context.Context) map[Priority]int
-
-    // Stats returns queue statistics
-    Stats(ctx context.Context) QueueStats
-}
-
-type QueueStats struct {
-    TotalEnqueued   int64
-    TotalProcessed  int64
-    TotalTimeout    int64
-    AverageWaitTime time.Duration
-    CurrentDepth    int
+func IsCacheable(req backend.GenerateRequest) bool {
+    // Only cache deterministic requests
+    return req.Temperature == 0 || req.Temperature <= 0.1
 }
 \end{lstlisting}
 \end{programcode}
 
-% =============================================================================
-\section{Implementing Priority Queue}
-\label{sec:priority-queue-impl}
-% =============================================================================
+\subsection{Implementation}
+\label{subsec:exact-cache-impl}
 
-% TODO: Implementation
-
-\subsection{Heap-Based Priority Queue}
-\label{subsec:heap-queue}
-
-% TODO: Using container/heap
-% - Standard library approach
-% - Efficient O(log n) operations
-
-\subsection{Multiple Queue Approach}
-\label{subsec:multi-queue}
-
-% TODO: Separate queues per priority
-% - Simple round-robin
-% - Weighted fair queueing
+% TODO: Simple exact match implementation
 
 % =============================================================================
-\section{Fairness Algorithms}
-\label{sec:fairness}
+\section{Semantic Caching}
+\label{sec:semantic-caching}
 % =============================================================================
 
-% TODO: Preventing starvation
+% TODO: The smart approach
 
-\subsection{Weighted Fair Queueing}
-\label{subsec:wfq}
+\subsection{How Semantic Caching Works}
+\label{subsec:semantic-how}
 
-% TODO: WFQ explained
-% - Weights per priority
-% - Preventing low-priority starvation
+% TODO: Embedding-based similarity
+% - Generate embeddings for prompts
+% - Store in vector database
+% - Find similar queries
+% - Return cached response if similar enough
 
-\subsection{Deficit Round Robin}
-\label{subsec:drr}
+\subsection{Embedding Models for Caching}
+\label{subsec:cache-embeddings}
 
-% TODO: DRR for simplicity
-% - How it works
-% - Implementation
+% TODO: Choosing embedding models
+% - Small, fast models
+% - Sentence transformers
+% - OpenAI embeddings
+% - Local options
 
-% =============================================================================
-\section{Timeout Handling}
-\label{sec:timeout-handling}
-% =============================================================================
+\subsection{Similarity Thresholds}
+\label{subsec:similarity-thresholds}
 
-% TODO: Managing deadlines
+% TODO: Setting thresholds
+% - Too high: poor hit rate
+% - Too low: wrong responses
+% - Task-dependent tuning
 
-\subsection{Queue Timeout}
-\label{subsec:queue-timeout}
-
-% TODO: Max time in queue
-% - Per-priority timeouts
-% - Removing stale requests
-
-\subsection{Processing Timeout}
-\label{subsec:processing-timeout}
-
-% TODO: Max inference time
-% - Context cancellation
-% - Resource cleanup
-
-% =============================================================================
-\section{Load Shedding}
-\label{sec:load-shedding}
-% =============================================================================
-
-% TODO: When queue gets too long
-
-\subsection{Queue Limits}
-\label{subsec:queue-limits}
-
-% TODO: Max queue depth
-% - Per-priority limits
-% - System-wide limits
-
-\subsection{Graceful Rejection}
-\label{subsec:graceful-rejection}
-
-% TODO: How to reject
-% - 503 Service Unavailable
-% - Retry-After header
-% - Queue position estimation
-
-\begin{programcode}{Load Shedding Configuration}
+\begin{programcode}{Semantic Cache Interface}
 \begin{lstlisting}[language=Go]
-// internal/queue/config.go
+// internal/cache/semantic.go
 
-type QueueConfig struct {
-    // Maximum queue depth per priority
-    MaxDepth map[Priority]int `yaml:"max_depth"`
+type SemanticCache interface {
+    // Get finds semantically similar cached response
+    Get(ctx context.Context, key CacheKey) (*CacheEntry, error)
 
-    // Maximum wait time in queue
-    MaxWaitTime map[Priority]time.Duration `yaml:"max_wait_time"`
+    // Set stores response with embedding
+    Set(ctx context.Context, key CacheKey, response string, ttl time.Duration) error
 
-    // Processing timeout
-    ProcessingTimeout time.Duration `yaml:"processing_timeout"`
-
-    // Weights for fair queueing (higher = more service)
-    Weights map[Priority]int `yaml:"weights"`
+    // SetThreshold sets similarity threshold (0.0 - 1.0)
+    SetThreshold(threshold float64)
 }
 
-var DefaultQueueConfig = QueueConfig{
-    MaxDepth: map[Priority]int{
-        PriorityLow:      100,
-        PriorityNormal:   500,
-        PriorityHigh:     1000,
-        PriorityCritical: 5000,
-    },
-    MaxWaitTime: map[Priority]time.Duration{
-        PriorityLow:      30 * time.Second,
-        PriorityNormal:   60 * time.Second,
-        PriorityHigh:     120 * time.Second,
-        PriorityCritical: 300 * time.Second,
-    },
-    ProcessingTimeout: 5 * time.Minute,
-    Weights: map[Priority]int{
-        PriorityLow:      1,
-        PriorityNormal:   3,
-        PriorityHigh:     10,
-        PriorityCritical: 50,
-    },
+type CacheEntry struct {
+    Response   string
+    Similarity float64  // How similar the query was
+    CachedAt   time.Time
+    HitCount   int
+}
+
+type VectorSemanticCache struct {
+    embedder   Embedder
+    vectorDB   VectorStore
+    threshold  float64
+    exactCache Cache // Fallback to exact match
 }
 \end{lstlisting}
 \end{programcode}
 
 % =============================================================================
-\section{Worker Pool}
-\label{sec:worker-pool}
+\section{Cache Storage Options}
+\label{sec:cache-storage}
 % =============================================================================
 
-% TODO: Processing requests from queue
+% TODO: Where to store cache
 
-\subsection{Worker Design}
-\label{subsec:worker-design}
+\subsection{Redis}
+\label{subsec:redis-cache}
 
-% TODO: Worker goroutines
-% - Pool size configuration
-% - Graceful shutdown
+% TODO: Redis for exact match
+% - Fast
+% - TTL support
+% - Distributed
 
-\subsection{Scaling Workers}
-\label{subsec:scaling-workers}
+\subsection{Vector Databases}
+\label{subsec:vector-db-cache}
 
-% TODO: Dynamic scaling
-% - Based on queue depth
-% - Based on GPU utilization
+% TODO: Vector DBs for semantic
+% - Qdrant
+% - Milvus
+% - Pinecone
+% - pgvector
+
+\subsection{Hybrid Approach}
+\label{subsec:hybrid-cache}
+
+% TODO: Combining both
+% - Exact match first (Redis)
+% - Semantic match second (Vector DB)
 
 % =============================================================================
-\section{Metrics and Visibility}
-\label{sec:queue-metrics}
+\section{Cache Invalidation}
+\label{sec:cache-invalidation}
+% =============================================================================
+
+% TODO: The hard problem
+
+\subsection{TTL-Based Invalidation}
+\label{subsec:ttl-invalidation}
+
+% TODO: Time-based expiry
+% - Simple and effective
+% - Task-appropriate TTLs
+
+\subsection{Model-Based Invalidation}
+\label{subsec:model-invalidation}
+
+% TODO: Invalidate on model change
+% - Model version tracking
+% - Automatic invalidation
+
+\subsection{Manual Invalidation}
+\label{subsec:manual-invalidation}
+
+% TODO: Admin controls
+% - Flush specific entries
+% - Bulk invalidation
+
+% =============================================================================
+\section{Cache Warming}
+\label{sec:cache-warming}
+% =============================================================================
+
+% TODO: Proactive caching
+% - Pre-computing common queries
+% - Background generation
+% - Traffic pattern analysis
+
+% =============================================================================
+\section{Metrics and Monitoring}
+\label{sec:cache-metrics}
 % =============================================================================
 
 % TODO: What to track
-% - Queue depth
-% - Wait time percentiles
-% - Rejection rate
-% - Timeout rate
+% - Hit rate
+% - Miss rate
+% - Similarity distribution
+% - Cost savings
 
 % =============================================================================
 \section{Integration with Control Plane}
-\label{sec:queue-integration}
+\label{sec:cache-integration}
 % =============================================================================
 
 % TODO: Wiring it together
-% - Synchronous vs async API
-% - Webhook callbacks
-% - Polling endpoints
+% - Cache middleware
+% - Configuration
+% - Bypass options
 
 % =============================================================================
 \section{Summary}
-\label{sec:ch09-summary}
+\label{sec:ch08-summary}
 % =============================================================================
 
 \begin{important}{Key Takeaways}
 \begin{itemize}
-\item Queues enable graceful handling of traffic spikes
-\item Priority levels ensure important requests get served first
-\item Fairness algorithms prevent starvation of lower priorities
-\item Load shedding protects the system from overload
-\item Clear visibility into queue state is essential
+\item Caching can reduce inference costs by 30-70\% for suitable workloads
+\item Exact match is simple but limited; semantic caching is more powerful
+\item Only cache deterministic requests (temperature $\approx$ 0)
+\item TTL-based invalidation is simple and usually sufficient
+\item Track cache hit rates and cost savings
 \end{itemize}
 \end{important}
 
@@ -295,21 +269,21 @@ var DefaultQueueConfig = QueueConfig{
 % =============================================================================
 
 \begin{prob}
-\label{prob:ch09-priority-queue}
-\textbf{Priority Queue Implementation}\\
-Implement a priority queue using Go's container/heap package. Support multiple priority levels with configurable weights.
+\label{prob:ch08-exact-cache}
+\textbf{Exact Match Cache}\\
+Implement an exact match cache using Redis. Include TTL support and metrics tracking.
 \end{prob}
 
 \begin{prob}
-\label{prob:ch09-worker-pool}
-\textbf{Worker Pool}\\
-Build a worker pool that processes requests from the priority queue. Include graceful shutdown and dynamic scaling based on queue depth.
+\label{prob:ch08-semantic-cache}
+\textbf{Semantic Cache}\\
+Build a semantic cache using sentence embeddings and a vector database. Implement threshold tuning based on hit rate vs accuracy trade-off.
 \end{prob}
 
 \begin{prob}
-\label{prob:ch09-load-test}
-\textbf{Load Testing}\\
-Create a load testing tool that generates traffic at various rates. Measure queue behavior under normal load, overload, and spike scenarios.
+\label{prob:ch08-cache-analysis}
+\textbf{Cache Effectiveness Analysis}\\
+Given a dataset of 10,000 prompts, analyze the potential effectiveness of exact vs semantic caching. Calculate expected hit rates and cost savings.
 \end{prob}
 
-\input{chapters/references09}
+\input{chapters/references08}

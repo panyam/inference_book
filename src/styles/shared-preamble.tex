@@ -1,0 +1,90 @@
+%%%%%%%%%%%%%%%%%%%%%%%% shared-preamble.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Shared preamble for both full book and standalone chapter builds
+% This ensures consistent formatting across all build modes
+%%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Font encoding and text packages
+\usepackage[T1]{fontenc}
+\usepackage{textcomp}
+
+% Core packages
+\usepackage{type1cm}
+\usepackage{makeidx}
+\usepackage{graphicx}
+\usepackage{multicol}
+\usepackage[bottom]{footmisc}
+\usepackage{newtxtext}
+\usepackage[varvw]{newtxmath}
+
+% Code listings
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{upquote}
+
+% Other packages
+\usepackage{todonotes}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{amsmath}
+\usepackage{tikz}
+\usetikzlibrary{positioning}
+
+% Code listing style for Go
+\lstdefinelanguage{Go}{
+  keywords={break, case, chan, const, continue, default, defer, else, fallthrough, for, func, go, goto, if, import, interface, map, package, range, return, select, struct, switch, type, var},
+  keywordstyle=\color{blue}\bfseries,
+  ndkeywords={string, int, int64, float64, bool, error, nil, true, false, context, Context},
+  ndkeywordstyle=\color{teal}\bfseries,
+  identifierstyle=\color{black},
+  sensitive=true,
+  comment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  commentstyle=\color{gray}\ttfamily,
+  stringstyle=\color{red}\ttfamily,
+  morestring=[b]',
+  morestring=[b]",
+  morestring=[b]`
+}
+
+% Code listing style - optimized for copy-paste
+\lstset{
+  basicstyle=\small\ttfamily,
+  breakatwhitespace=false,
+  breaklines=true,
+  captionpos=b,
+  keepspaces=true,
+  columns=fullflexible,
+  numbers=none,
+  showspaces=false,
+  showstringspaces=false,
+  showtabs=false,
+  tabsize=2,
+  frame=single,
+  framerule=0.5pt,
+  rulecolor=\color{gray},
+  backgroundcolor=\color{gray!5},
+  upquote=true
+}
+
+% Hyperref setup
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  filecolor=magenta,
+  urlcolor=cyan,
+  pdftitle={Self-Hosted AI Inference: A Systems Engineer's Guide},
+  pdfauthor={Author Name},
+  pdfsubject={AI Infrastructure, Machine Learning Operations},
+  pdfkeywords={AI, inference, LLM, GPU, self-hosted, control plane}
+}
+
+% Graphics path
+\graphicspath{{figures/}}
+
+% Fix for overfull boxes in Springer environments
+% Add slight flexibility to box environments
+\tolerance=1000
+\emergencystretch=1em
+\hfuzz=2pt
+\vfuzz=2pt

@@ -1,267 +1,562 @@
-%%%%%%%%%%%%%%%%%%%%% chapter06.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%% chapter05.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% Chapter 6: Authentication and API Keys
+% Chapter 5: Building Control Plane v0.1
 %
 %%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Authentication and API Keys}
-\label{ch:authentication}
+\chapter{Building Control Plane v0.1}
+\label{ch:control-plane-v01}
 
-\abstract*{A production inference service needs proper access control. This chapter covers API key management, JWT-based authentication for web clients, and multi-tenant considerations. We implement authentication middleware for the control plane, design a user and key management system, and discuss security best practices for AI inference APIs.}
+\abstract*{This chapter is where theory meets practice. We build the first version of our Go-based control plane---a foundation that will evolve throughout the book. Control Plane v0.1 provides a single backend proxy, unified API, health checks, metrics collection, and Docker deployment with Prometheus and Grafana. By the end, you'll have a working inference system with observability built in from day one.}
 
-\abstract{A production inference service needs proper access control. This chapter covers API key management, JWT-based authentication for web clients, and multi-tenant considerations. We implement authentication middleware for the control plane, design a user and key management system, and discuss security best practices for AI inference APIs.}
-
-% =============================================================================
-\section{Why Authentication Matters}
-\label{sec:auth-matters}
-% =============================================================================
-
-% TODO: The case for authentication
-% - Cost control (GPU time isn't free)
-% - Audit trails
-% - Rate limiting per user
-% - Usage billing
-% - Access control
+\abstract{This chapter is where theory meets practice. We build the first version of our Go-based control plane---a foundation that will evolve throughout the book. Control Plane v0.1 provides a single backend proxy, unified API, health checks, metrics collection, and Docker deployment with Prometheus and Grafana. By the end, you'll have a working inference system with observability built in from day one.}
 
 % =============================================================================
-\section{Authentication Methods}
-\label{sec:auth-methods}
+\section{Control Plane Architecture}
+\label{sec:cp-architecture}
 % =============================================================================
 
-\subsection{API Keys}
-\label{subsec:api-keys}
+% TODO: High-level architecture overview
 
-% TODO: API key design
-% - Generation (secure random)
-% - Prefix for identification (sk-, pk-)
-% - Hashing for storage
-% - Key rotation
+\subsection{What is a Control Plane?}
+\label{subsec:what-is-control-plane}
 
-\subsection{JWT Tokens}
-\label{subsec:jwt-tokens}
+% TODO: Define the concept
+% - Separating control from data flow
+% - Why abstraction matters
+% - Evolution path
 
-% TODO: JWT for web clients
-% - Structure
-% - Claims
-% - Signing
-% - Refresh tokens
+\subsection{v0.1 Capabilities}
+\label{subsec:v01-capabilities}
 
-\subsection{OAuth2 Integration}
-\label{subsec:oauth2}
+% TODO: What we're building
+% - Single backend proxy
+% - Unified API (OpenAI-compatible)
+% - Health checks
+% - Metrics (Prometheus)
+% - Configuration management
 
-% TODO: Enterprise integration
-% - When needed
-% - Implementation considerations
+\subsection{System Architecture Diagram}
+\label{subsec:architecture-diagram}
+
+% TODO: ASCII or figure showing:
+% Client -> Control Plane -> Inference Engine (Ollama/vLLM)
+%                |
+%                v
+%           Prometheus -> Grafana
 
 % =============================================================================
-\section{Implementing Authentication Middleware}
-\label{sec:auth-middleware}
+\section{Project Setup}
+\label{sec:project-setup}
 % =============================================================================
 
-% TODO: Go implementation
+% TODO: Setting up the Go project
 
-\begin{programcode}{Authentication Middleware}
+\subsection{Go Module Initialization}
+\label{subsec:go-module}
+
+\begin{programcode}{Project Structure}
+\begin{lstlisting}[language=bash]
+# Initialize project
+mkdir inference-control-plane
+cd inference-control-plane
+go mod init github.com/yourorg/inference-control-plane
+
+# Create directory structure
+mkdir -p cmd/server
+mkdir -p internal/{api,backend,config,health,metrics}
+mkdir -p deployments/docker
+mkdir -p configs
+\end{lstlisting}
+\end{programcode}
+
+\subsection{Dependencies}
+\label{subsec:dependencies}
+
+% TODO: Key dependencies
+% - chi or standard library router
+% - prometheus client
+% - structured logging (slog)
+% - configuration (viper or similar)
+
+% =============================================================================
+\section{Core Interfaces}
+\label{sec:core-interfaces}
+% =============================================================================
+
+% TODO: Define the foundational interfaces
+
+\subsection{Backend Interface}
+\label{subsec:backend-interface}
+
+\begin{programcode}{Backend Interface}
 \begin{lstlisting}[language=Go]
-// internal/auth/middleware.go
+// internal/backend/backend.go
 
-package auth
+package backend
 
-import (
-    "context"
-    "net/http"
-    "strings"
+import "context"
+
+// GenerateRequest represents an inference request
+type GenerateRequest struct {
+    Model       string   `json:"model"`
+    Prompt      string   `json:"prompt"`
+    MaxTokens   int      `json:"max_tokens,omitempty"`
+    Temperature float64  `json:"temperature,omitempty"`
+    Stream      bool     `json:"stream,omitempty"`
+    Stop        []string `json:"stop,omitempty"`
+}
+
+// GenerateResponse represents an inference response
+type GenerateResponse struct {
+    ID      string `json:"id"`
+    Object  string `json:"object"`
+    Created int64  `json:"created"`
+    Model   string `json:"model"`
+    Choices []Choice `json:"choices"`
+    Usage   Usage  `json:"usage"`
+}
+
+type Choice struct {
+    Index        int    `json:"index"`
+    Text         string `json:"text,omitempty"`
+    Message      *Message `json:"message,omitempty"`
+    FinishReason string `json:"finish_reason"`
+}
+
+type Message struct {
+    Role    string `json:"role"`
+    Content string `json:"content"`
+}
+
+type Usage struct {
+    PromptTokens     int `json:"prompt_tokens"`
+    CompletionTokens int `json:"completion_tokens"`
+    TotalTokens      int `json:"total_tokens"`
+}
+
+// Backend defines the interface for inference backends
+type Backend interface {
+    // Generate performs text generation
+    Generate(ctx context.Context, req GenerateRequest) (GenerateResponse, error)
+
+    // Health checks if the backend is healthy
+    Health(ctx context.Context) error
+
+    // Name returns the backend identifier
+    Name() string
+}
+\end{lstlisting}
+\end{programcode}
+
+\subsection{Health Interface}
+\label{subsec:health-interface}
+
+\begin{programcode}{Health Check Interface}
+\begin{lstlisting}[language=Go]
+// internal/health/health.go
+
+package health
+
+import "context"
+
+// Status represents health status
+type Status string
+
+const (
+    StatusHealthy   Status = "healthy"
+    StatusDegraded  Status = "degraded"
+    StatusUnhealthy Status = "unhealthy"
 )
 
-type contextKey string
-
-const UserContextKey contextKey = "user"
-
-type User struct {
-    ID       string
-    Email    string
-    Tier     string // "free", "pro", "enterprise"
-    APIKeyID string
+// CheckResult contains a health check result
+type CheckResult struct {
+    Name    string `json:"name"`
+    Status  Status `json:"status"`
+    Message string `json:"message,omitempty"`
+    Latency int64  `json:"latency_ms"`
 }
 
-type Authenticator interface {
-    ValidateAPIKey(ctx context.Context, key string) (*User, error)
-    ValidateJWT(ctx context.Context, token string) (*User, error)
+// Checker defines a health check component
+type Checker interface {
+    Check(ctx context.Context) CheckResult
+    Name() string
 }
 
-func AuthMiddleware(auth Authenticator) func(http.Handler) http.Handler {
-    return func(next http.Handler) http.Handler {
-        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-            // Check Authorization header
-            authHeader := r.Header.Get("Authorization")
-            if authHeader == "" {
-                http.Error(w, "missing authorization", http.StatusUnauthorized)
-                return
-            }
+// Aggregator combines multiple health checks
+type Aggregator interface {
+    Register(checker Checker)
+    CheckAll(ctx context.Context) []CheckResult
+    OverallStatus(ctx context.Context) Status
+}
+\end{lstlisting}
+\end{programcode}
 
-            var user *User
-            var err error
+% =============================================================================
+\section{Implementing the Ollama Backend}
+\label{sec:ollama-backend}
+% =============================================================================
 
-            if strings.HasPrefix(authHeader, "Bearer ") {
-                token := strings.TrimPrefix(authHeader, "Bearer ")
+% TODO: Concrete implementation
 
-                // Try API key first (sk- prefix)
-                if strings.HasPrefix(token, "sk-") {
-                    user, err = auth.ValidateAPIKey(r.Context(), token)
-                } else {
-                    // Assume JWT
-                    user, err = auth.ValidateJWT(r.Context(), token)
-                }
-            } else {
-                http.Error(w, "invalid authorization format", http.StatusUnauthorized)
-                return
-            }
+\begin{programcode}{Ollama Backend Implementation}
+\begin{lstlisting}[language=Go]
+// internal/backend/ollama.go
 
-            if err != nil {
-                http.Error(w, "invalid credentials", http.StatusUnauthorized)
-                return
-            }
+package backend
 
-            // Add user to context
-            ctx := context.WithValue(r.Context(), UserContextKey, user)
-            next.ServeHTTP(w, r.WithContext(ctx))
-        })
+import (
+    "bytes"
+    "context"
+    "encoding/json"
+    "fmt"
+    "net/http"
+    "time"
+)
+
+type OllamaBackend struct {
+    baseURL    string
+    httpClient *http.Client
+    model      string
+}
+
+func NewOllamaBackend(baseURL, model string) *OllamaBackend {
+    return &OllamaBackend{
+        baseURL: baseURL,
+        model:   model,
+        httpClient: &http.Client{
+            Timeout: 5 * time.Minute,
+        },
     }
 }
 
-// GetUser retrieves user from context
-func GetUser(ctx context.Context) *User {
-    user, _ := ctx.Value(UserContextKey).(*User)
-    return user
+func (b *OllamaBackend) Name() string {
+    return "ollama"
+}
+
+func (b *OllamaBackend) Generate(ctx context.Context, req GenerateRequest) (GenerateResponse, error) {
+    // Convert to Ollama format
+    ollamaReq := map[string]interface{}{
+        "model":  req.Model,
+        "prompt": req.Prompt,
+        "stream": false,
+    }
+
+    if req.MaxTokens > 0 {
+        ollamaReq["num_predict"] = req.MaxTokens
+    }
+    if req.Temperature > 0 {
+        ollamaReq["temperature"] = req.Temperature
+    }
+
+    body, err := json.Marshal(ollamaReq)
+    if err != nil {
+        return GenerateResponse{}, fmt.Errorf("marshal request: %w", err)
+    }
+
+    httpReq, err := http.NewRequestWithContext(
+        ctx,
+        http.MethodPost,
+        b.baseURL+"/api/generate",
+        bytes.NewReader(body),
+    )
+    if err != nil {
+        return GenerateResponse{}, fmt.Errorf("create request: %w", err)
+    }
+    httpReq.Header.Set("Content-Type", "application/json")
+
+    resp, err := b.httpClient.Do(httpReq)
+    if err != nil {
+        return GenerateResponse{}, fmt.Errorf("execute request: %w", err)
+    }
+    defer resp.Body.Close()
+
+    if resp.StatusCode != http.StatusOK {
+        return GenerateResponse{}, fmt.Errorf("ollama returned status %d", resp.StatusCode)
+    }
+
+    var ollamaResp struct {
+        Response string `json:"response"`
+    }
+    if err := json.NewDecoder(resp.Body).Decode(&ollamaResp); err != nil {
+        return GenerateResponse{}, fmt.Errorf("decode response: %w", err)
+    }
+
+    // Convert to standard format
+    return GenerateResponse{
+        ID:      fmt.Sprintf("gen-%d", time.Now().UnixNano()),
+        Object:  "text_completion",
+        Created: time.Now().Unix(),
+        Model:   req.Model,
+        Choices: []Choice{{
+            Index:        0,
+            Text:         ollamaResp.Response,
+            FinishReason: "stop",
+        }},
+    }, nil
+}
+
+func (b *OllamaBackend) Health(ctx context.Context) error {
+    req, err := http.NewRequestWithContext(ctx, http.MethodGet, b.baseURL+"/api/tags", nil)
+    if err != nil {
+        return err
+    }
+
+    resp, err := b.httpClient.Do(req)
+    if err != nil {
+        return err
+    }
+    defer resp.Body.Close()
+
+    if resp.StatusCode != http.StatusOK {
+        return fmt.Errorf("unhealthy: status %d", resp.StatusCode)
+    }
+    return nil
 }
 \end{lstlisting}
 \end{programcode}
 
 % =============================================================================
-\section{API Key Management}
-\label{sec:api-key-management}
+\section{API Server}
+\label{sec:api-server}
 % =============================================================================
 
-% TODO: Key lifecycle
+% TODO: HTTP API implementation
 
-\subsection{Key Generation}
-\label{subsec:key-generation}
+\subsection{Router Setup}
+\label{subsec:router-setup}
 
-% TODO: Secure generation
-% - Cryptographically secure random
-% - Prefix for type identification
-% - Length considerations
+% TODO: Setting up routes
+% - POST /v1/completions
+% - POST /v1/chat/completions
+% - GET /health
+% - GET /metrics
 
-\subsection{Key Storage}
-\label{subsec:key-storage}
+\subsection{Request Handling}
+\label{subsec:request-handling}
 
-% TODO: Secure storage
-% - Never store plaintext
-% - Hash with bcrypt/argon2
-% - Prefix for lookup
-
-\subsection{Key Rotation}
-\label{subsec:key-rotation}
-
-% TODO: Rotation strategies
-% - Graceful rotation
-% - Overlap period
-% - Notification
-
-\subsection{Key Revocation}
-\label{subsec:key-revocation}
-
-% TODO: Revocation handling
-% - Immediate vs graceful
-% - Audit logging
+% TODO: Middleware and handlers
 
 % =============================================================================
-\section{User and Organization Model}
-\label{sec:user-model}
+\section{Metrics with Prometheus}
+\label{sec:prometheus-metrics}
 % =============================================================================
 
-% TODO: Data model design
+% TODO: Metrics implementation
 
-\begin{programcode}{User Data Model}
+\subsection{Key Metrics to Track}
+\label{subsec:key-metrics}
+
+% TODO: What to measure
+% - Request count
+% - Request latency
+% - Token throughput
+% - Error rates
+% - Backend health
+
+\begin{programcode}{Metrics Definition}
 \begin{lstlisting}[language=Go]
-// internal/auth/models.go
+// internal/metrics/metrics.go
 
-type Organization struct {
-    ID        string    `json:"id"`
-    Name      string    `json:"name"`
-    Tier      string    `json:"tier"`
-    CreatedAt time.Time `json:"created_at"`
-}
+package metrics
 
-type User struct {
-    ID             string    `json:"id"`
-    Email          string    `json:"email"`
-    OrganizationID string    `json:"organization_id"`
-    Role           string    `json:"role"` // admin, member
-    CreatedAt      time.Time `json:"created_at"`
-}
+import (
+    "github.com/prometheus/client_golang/prometheus"
+    "github.com/prometheus/client_golang/prometheus/promauto"
+)
 
-type APIKey struct {
-    ID             string    `json:"id"`
-    Prefix         string    `json:"prefix"` // First 8 chars for lookup
-    HashedKey      string    `json:"-"`      // Never expose
-    Name           string    `json:"name"`
-    UserID         string    `json:"user_id"`
-    OrganizationID string    `json:"organization_id"`
-    Scopes         []string  `json:"scopes"`
-    ExpiresAt      *time.Time `json:"expires_at,omitempty"`
-    LastUsedAt     *time.Time `json:"last_used_at,omitempty"`
-    CreatedAt      time.Time `json:"created_at"`
-    RevokedAt      *time.Time `json:"revoked_at,omitempty"`
-}
+var (
+    RequestsTotal = promauto.NewCounterVec(
+        prometheus.CounterOpts{
+            Name: "inference_requests_total",
+            Help: "Total number of inference requests",
+        },
+        []string{"model", "status"},
+    )
+
+    RequestDuration = promauto.NewHistogramVec(
+        prometheus.HistogramOpts{
+            Name:    "inference_request_duration_seconds",
+            Help:    "Request duration in seconds",
+            Buckets: []float64{0.1, 0.5, 1, 2, 5, 10, 30, 60},
+        },
+        []string{"model"},
+    )
+
+    TokensGenerated = promauto.NewCounterVec(
+        prometheus.CounterOpts{
+            Name: "inference_tokens_generated_total",
+            Help: "Total tokens generated",
+        },
+        []string{"model"},
+    )
+
+    BackendHealth = promauto.NewGaugeVec(
+        prometheus.GaugeOpts{
+            Name: "inference_backend_health",
+            Help: "Backend health status (1 = healthy, 0 = unhealthy)",
+        },
+        []string{"backend"},
+    )
+)
 \end{lstlisting}
 \end{programcode}
 
 % =============================================================================
-\section{Security Best Practices}
-\label{sec:security-best-practices}
+\section{Docker Deployment}
+\label{sec:docker-deployment}
 % =============================================================================
 
-% TODO: Security considerations
-% - HTTPS only
-% - Rate limiting on auth endpoints
-% - Audit logging
-% - Key hygiene
-% - Principle of least privilege
+% TODO: Docker setup
 
-\begin{warning}{Security Considerations}
-\begin{itemize}
-\item Always use HTTPS in production
-\item Rate limit authentication endpoints aggressively
-\item Log all authentication events
-\item Set reasonable key expiration policies
-\item Implement proper key scoping
-\end{itemize}
-\end{warning}
+\subsection{Dockerfile}
+\label{subsec:dockerfile}
+
+% TODO: Multi-stage build
+
+\subsection{Docker Compose Stack}
+\label{subsec:docker-compose}
+
+\begin{programcode}{Docker Compose}
+\begin{lstlisting}[language=bash]
+# deployments/docker/docker-compose.yml
+
+version: '3.8'
+
+services:
+  control-plane:
+    build:
+      context: ../..
+      dockerfile: deployments/docker/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - BACKEND_URL=http://ollama:11434
+      - METRICS_PORT=9090
+    depends_on:
+      - ollama
+      - prometheus
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+
+volumes:
+  ollama_data:
+  prometheus_data:
+  grafana_data:
+\end{lstlisting}
+\end{programcode}
 
 % =============================================================================
-\section{Integration with Control Plane}
-\label{sec:auth-integration}
+\section{Grafana Dashboard}
+\label{sec:grafana-dashboard}
 % =============================================================================
 
-% TODO: Wiring it together
-% - Adding middleware to router
-% - User context in handlers
-% - Per-user metrics
+% TODO: Dashboard creation
+% - Request rate panel
+% - Latency percentiles
+% - Error rate
+% - Token throughput
+% - Backend health
+
+% =============================================================================
+\section{Testing the Control Plane}
+\label{sec:testing-control-plane}
+% =============================================================================
+
+% TODO: Integration testing
+% - Starting the stack
+% - Making test requests
+% - Verifying metrics
+% - Checking dashboards
+
+% =============================================================================
+\section{Configuration Management}
+\label{sec:configuration}
+% =============================================================================
+
+% TODO: Config file and environment variables
+
+\begin{programcode}{Configuration}
+\begin{lstlisting}[language=Go]
+// internal/config/config.go
+
+package config
+
+type Config struct {
+    Server  ServerConfig  `yaml:"server"`
+    Backend BackendConfig `yaml:"backend"`
+    Metrics MetricsConfig `yaml:"metrics"`
+}
+
+type ServerConfig struct {
+    Host string `yaml:"host" env:"SERVER_HOST" default:"0.0.0.0"`
+    Port int    `yaml:"port" env:"SERVER_PORT" default:"8080"`
+}
+
+type BackendConfig struct {
+    Type    string `yaml:"type" env:"BACKEND_TYPE" default:"ollama"`
+    URL     string `yaml:"url" env:"BACKEND_URL" default:"http://localhost:11434"`
+    Model   string `yaml:"model" env:"BACKEND_MODEL" default:"llama3.2:7b"`
+    Timeout int    `yaml:"timeout" env:"BACKEND_TIMEOUT" default:"300"`
+}
+
+type MetricsConfig struct {
+    Enabled bool   `yaml:"enabled" env:"METRICS_ENABLED" default:"true"`
+    Path    string `yaml:"path" env:"METRICS_PATH" default:"/metrics"`
+}
+\end{lstlisting}
+\end{programcode}
 
 % =============================================================================
 \section{Summary}
-\label{sec:ch06-summary}
+\label{sec:ch05-summary}
 % =============================================================================
 
 \begin{important}{Key Takeaways}
 \begin{itemize}
-\item API keys are the standard for programmatic access
-\item JWTs work well for web-based clients
-\item Always hash keys before storage
-\item Key rotation should be graceful with overlap periods
-\item Audit logging is essential for security and debugging
+\item Control Plane v0.1 provides abstraction over inference backends
+\item Interface-driven design enables future extensibility
+\item Observability (metrics + health checks) is built-in from day one
+\item Docker Compose provides a complete development environment
+\item This foundation will evolve throughout the book
 \end{itemize}
 \end{important}
+
+\begin{svgraybox}
+\textbf{What's Next:}
+
+In the optional Chapter 5.5, we'll add browser-based inference for zero-cost deployments. In Part II, we'll enhance this control plane with authentication, rate limiting, caching, and multi-model routing for 30B+ production deployments.
+\end{svgraybox}
 
 % =============================================================================
 \section*{Problems}
@@ -269,21 +564,21 @@ type APIKey struct {
 % =============================================================================
 
 \begin{prob}
-\label{prob:ch06-key-generator}
-\textbf{API Key Generator}\\
-Implement a secure API key generator that produces keys with format \texttt{sk-live-<32 random chars>}. Include functions for hashing and validating keys.
+\label{prob:ch05-vllm-backend}
+\textbf{vLLM Backend Implementation}\\
+Implement a \texttt{VLLMBackend} struct that satisfies the \texttt{Backend} interface. It should communicate with vLLM's OpenAI-compatible API.
 \end{prob}
 
 \begin{prob}
-\label{prob:ch06-jwt-service}
-\textbf{JWT Authentication Service}\\
-Create a JWT service that issues tokens with user claims, validates signatures, and handles refresh tokens. Include proper expiration handling.
+\label{prob:ch05-streaming}
+\textbf{Streaming Support}\\
+Extend the \texttt{Backend} interface to support streaming responses. Implement streaming for the Ollama backend.
 \end{prob}
 
 \begin{prob}
-\label{prob:ch06-audit-log}
-\textbf{Authentication Audit Log}\\
-Design and implement an audit log system that records all authentication events including successful logins, failed attempts, key creation, and revocation.
+\label{prob:ch05-dashboard}
+\textbf{Custom Grafana Dashboard}\\
+Create a Grafana dashboard that displays: (a) request rate over time, (b) p50/p95/p99 latency, (c) tokens per second, and (d) error rate. Export the dashboard as JSON.
 \end{prob}
 
-\input{chapters/references06}
+\input{chapters/references05}

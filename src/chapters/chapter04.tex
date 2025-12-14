@@ -1,354 +1,276 @@
-%%%%%%%%%%%%%%%%%%%%% chapter04.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%% chapter03.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% Chapter 4: Inference Engines
+% Chapter 3: Model Formats and Quantization
 %
 %%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Inference Engines}
-\label{ch:inference-engines}
+\chapter{Model Formats and Quantization}
+\label{ch:models}
 
-\abstract*{An inference engine is the core component that actually runs model computations. This chapter provides a deep dive into the major inference engines: Ollama for simplicity, llama.cpp for flexibility, and vLLM for production performance. We explain when to use each, how to configure them, and how they integrate with your control plane through their APIs.}
+\abstract*{The choice of model format and quantization level directly impacts performance, quality, and resource requirements. This chapter explains the major model formats (SafeTensors, GGUF, ONNX), demystifies quantization techniques (GPTQ, AWQ, GGML/GGUF), provides guidance on choosing models for different use cases, and introduces the concept of a model registry for your control plane. We focus on the practical knowledge needed to make informed model selection decisions.}
 
-\abstract{An inference engine is the core component that actually runs model computations. This chapter provides a deep dive into the major inference engines: Ollama for simplicity, llama.cpp for flexibility, and vLLM for production performance. We explain when to use each, how to configure them, and how they integrate with your control plane through their APIs.}
-
-% =============================================================================
-\section{The Role of Inference Engines}
-\label{sec:inference-engine-role}
-% =============================================================================
-
-% TODO: What inference engines do
-% - Load models into memory
-% - Process requests
-% - Manage batching
-% - Handle streaming
-% - Optimize throughput
+\abstract{The choice of model format and quantization level directly impacts performance, quality, and resource requirements. This chapter explains the major model formats (SafeTensors, GGUF, ONNX), demystifies quantization techniques (GPTQ, AWQ, GGML/GGUF), provides guidance on choosing models for different use cases, and introduces the concept of a model registry for your control plane. We focus on the practical knowledge needed to make informed model selection decisions.}
 
 % =============================================================================
-\section{Ollama: Simplicity First}
-\label{sec:ollama}
+\section{Understanding Model Formats}
+\label{sec:model-formats}
 % =============================================================================
 
-% TODO: Ollama deep dive
+% TODO: Overview of formats and their purposes
 
-\subsection{Architecture and Design Philosophy}
-\label{subsec:ollama-architecture}
+\subsection{SafeTensors}
+\label{subsec:safetensors}
 
-% TODO: How Ollama works
-% - Built on llama.cpp
-% - Model management abstraction
-% - REST API
-% - Modelfile system
+% TODO: The modern standard
+% - What it is
+% - Safety advantages over pickle
+% - Where it's used (HuggingFace standard)
+% - Loading and inspection
 
-\subsection{Installation and Configuration}
-\label{subsec:ollama-install}
+\subsection{GGUF (GPT-Generated Unified Format)}
+\label{subsec:gguf}
 
-% TODO: Setup instructions
-% - All platforms
-% - Configuration options
-% - Memory management
-% - GPU assignment
+% TODO: The llama.cpp format
+% - History: GGML -> GGUF
+% - Single-file advantage
+% - Metadata embedding
+% - Quantization built-in
+% - Where to find GGUF models
 
-\subsection{API Reference}
-\label{subsec:ollama-api}
+\subsection{ONNX (Open Neural Network Exchange)}
+\label{subsec:onnx}
 
-% TODO: Key endpoints
-% - /api/generate
-% - /api/chat
-% - /api/embeddings
-% - /api/tags
-% - /api/show
+% TODO: Cross-platform format
+% - Purpose and advantages
+% - When to use
+% - Conversion considerations
 
-\begin{programcode}{Ollama API Examples}
-\begin{lstlisting}[language=bash]
-# Generate completion
-curl http://localhost:11434/api/generate -d '{
-  "model": "llama3.2:7b",
-  "prompt": "Explain quantum computing",
-  "stream": false
-}'
+\subsection{Format Comparison}
+\label{subsec:format-comparison}
 
-# Chat completion
-curl http://localhost:11434/api/chat -d '{
-  "model": "llama3.2:7b",
-  "messages": [
-    {"role": "user", "content": "Hello!"}
-  ]
-}'
+% TODO: Comparison table
+% | Format | Use Case | Quantization | Ecosystem |
+% | SafeTensors | Training, HF | External | PyTorch, TF |
+% | GGUF | Inference | Built-in | llama.cpp |
+% | ONNX | Cross-platform | External | Multiple |
 
-# Generate embeddings
-curl http://localhost:11434/api/embeddings -d '{
-  "model": "nomic-embed-text",
-  "prompt": "Text to embed"
-}'
-\end{lstlisting}
-\end{programcode}
+% =============================================================================
+\section{Quantization Fundamentals}
+\label{sec:quantization-fundamentals}
+% =============================================================================
 
-\subsection{When to Use Ollama}
-\label{subsec:ollama-when}
+% TODO: What quantization is and why it matters
 
-% TODO: Use cases
-% - Development and prototyping
-% - Single-user deployments
-% - Low complexity requirements
-% - When model management matters
+\subsection{What is Quantization?}
+\label{subsec:what-is-quantization}
+
+% TODO: Core concepts
+% - Reducing precision
+% - Memory savings
+% - Speed improvements
+% - Quality trade-offs
+
+\subsection{Quantization Levels}
+\label{subsec:quantization-levels}
+
+% TODO: Common quantization levels
+% - Q8 (8-bit)
+% - Q6 (6-bit)
+% - Q5 (5-bit)
+% - Q4 (4-bit) - sweet spot
+% - Q3/Q2 (aggressive)
 
 \begin{svgraybox}
-\textbf{Ollama Strengths:}
+\textbf{The Quantization Sweet Spot:}
+
+For most use cases, Q4 (4-bit) quantization provides the best balance:
 \begin{itemize}
-\item Excellent developer experience
-\item Automatic model downloading and management
-\item Cross-platform (macOS, Linux, Windows)
-\item Good default configurations
+\item 4x memory reduction vs FP16
+\item Minimal quality degradation (typically <3\%)
+\item Sufficient precision for most tasks
+\item Good inference speed
 \end{itemize}
 
-\textbf{Ollama Limitations:}
-\begin{itemize}
-\item Limited batching capabilities
-\item No continuous batching
-\item Single-model focus
-\item Less production tuning options
-\end{itemize}
+Go lower (Q3/Q2) only when memory-constrained. Go higher (Q5/Q6) for quality-critical applications.
 \end{svgraybox}
 
 % =============================================================================
-\section{llama.cpp: Maximum Flexibility}
-\label{sec:llama-cpp}
+\section{Quantization Methods}
+\label{sec:quantization-methods}
 % =============================================================================
 
-% TODO: llama.cpp deep dive
+% TODO: Different quantization approaches
 
-\subsection{Architecture}
-\label{subsec:llama-cpp-architecture}
+\subsection{GGUF Quantization (llama.cpp)}
+\label{subsec:gguf-quantization}
 
-% TODO: How llama.cpp works
-% - C/C++ implementation
-% - Multi-backend (CPU, CUDA, Metal, etc.)
-% - GGUF format native
-% - server binary
+% TODO: GGUF quantization types
+% - Q4_K_M, Q4_K_S explained
+% - Q5_K_M, Q5_K_S
+% - What the K, M, S mean
+% - Choosing the right variant
 
-\subsection{Building and Installation}
-\label{subsec:llama-cpp-install}
+\subsection{GPTQ}
+\label{subsec:gptq}
 
-% TODO: Compilation options
-% - CPU-only build
-% - CUDA build
-% - Metal build
-% - Compilation flags
-
-\subsection{Server Mode}
-\label{subsec:llama-cpp-server}
-
-% TODO: Running as a server
-% - Command line options
-% - API compatibility (OpenAI-like)
-% - Configuration parameters
-
-\begin{programcode}{llama.cpp Server Launch}
-\begin{lstlisting}[language=bash]
-# Basic launch
-./llama-server \
-  -m models/llama-7b-q4_k_m.gguf \
-  --host 0.0.0.0 \
-  --port 8080 \
-  -c 4096 \
-  -ngl 35
-
-# Key parameters:
-# -m: Model path
-# -c: Context size
-# -ngl: Number of GPU layers (for partial offload)
-# --host/--port: Network binding
-\end{lstlisting}
-\end{programcode}
-
-\subsection{Advanced Configuration}
-\label{subsec:llama-cpp-advanced}
-
-% TODO: Performance tuning
-% - Layer offloading
-% - Thread configuration
-% - Memory mapping
-% - Batch size tuning
-
-\subsection{When to Use llama.cpp}
-\label{subsec:llama-cpp-when}
-
-% TODO: Use cases
-% - CPU inference
-% - Mixed CPU/GPU
-% - Custom deployments
-% - Resource-constrained environments
-% - Edge deployments
-
-% =============================================================================
-\section{vLLM: Production Performance}
-\label{sec:vllm}
-% =============================================================================
-
-% TODO: vLLM deep dive
-
-\subsection{Key Innovation: Paged Attention}
-\label{subsec:vllm-paged-attention}
-
-% TODO: Explain paged attention
-% - Memory fragmentation problem
-% - How paged attention solves it
-% - Throughput improvements
-
-\subsection{Continuous Batching}
-\label{subsec:vllm-continuous-batching}
-
-% TODO: Dynamic batching explanation
-% - Traditional batching limitations
-% - How continuous batching works
-% - Throughput vs latency trade-offs
-
-\subsection{Installation and Setup}
-\label{subsec:vllm-install}
-
-% TODO: Setup instructions
-% - pip install
-% - Docker deployment
-% - GPU requirements
-
-\begin{programcode}{vLLM Server Launch}
-\begin{lstlisting}[language=bash]
-# Using Python API
-python -m vllm.entrypoints.openai.api_server \
-  --model meta-llama/Llama-3.2-7b-instruct \
-  --dtype float16 \
-  --api-key token-abc123 \
-  --port 8000
-
-# Docker deployment
-docker run --gpus all \
-  -v ~/.cache/huggingface:/root/.cache/huggingface \
-  -p 8000:8000 \
-  vllm/vllm-openai:latest \
-  --model meta-llama/Llama-3.2-7b-instruct
-\end{lstlisting}
-\end{programcode}
-
-\subsection{API and OpenAI Compatibility}
-\label{subsec:vllm-api}
-
-% TODO: API reference
-% - OpenAI-compatible endpoints
-% - /v1/completions
-% - /v1/chat/completions
-% - /v1/embeddings
-
-\subsection{Performance Tuning}
-\label{subsec:vllm-tuning}
-
-% TODO: Optimization parameters
-% - tensor-parallel-size
-% - max-model-len
-% - gpu-memory-utilization
-% - dtype options
-
-\subsection{When to Use vLLM}
-\label{subsec:vllm-when}
-
-% TODO: Use cases
-% - High-throughput production
-% - Multiple concurrent users
-% - When latency matters
-% - Multi-GPU deployments
-
-\begin{svgraybox}
-\textbf{vLLM Strengths:}
-\begin{itemize}
-\item 2-4x higher throughput than naive implementations
-\item Continuous batching for efficient GPU utilization
-\item OpenAI API compatibility
-\item Multi-GPU support (tensor parallelism)
-\end{itemize}
-
-\textbf{vLLM Limitations:}
-\begin{itemize}
-\item GPU-only (no CPU inference)
-\item More complex setup
-\item Higher memory overhead
-\item Limited quantization support (improving)
-\end{itemize}
-\end{svgraybox}
-
-% =============================================================================
-\section{Other Engines Worth Knowing}
-\label{sec:other-engines}
-% =============================================================================
-
-\subsection{TensorRT-LLM}
-\label{subsec:tensorrt-llm}
-
-% TODO: NVIDIA's optimized engine
+% TODO: GPTQ quantization
+% - How it works (calibration-based)
+% - Advantages: accuracy preservation
+% - Disadvantages: requires GPU inference
 % - When to use
-% - Strengths and limitations
 
-\subsection{Text Generation Inference (TGI)}
-\label{subsec:tgi}
+\subsection{AWQ (Activation-aware Weight Quantization)}
+\label{subsec:awq}
 
-% TODO: HuggingFace's engine
+% TODO: AWQ quantization
+% - How it differs from GPTQ
+% - Performance characteristics
+% - Ecosystem support
+
+\subsection{BitsAndBytes}
+\label{subsec:bitsandbytes}
+
+% TODO: HuggingFace integration
+% - 8-bit and 4-bit options
+% - nf4 quantization
 % - When to use
-% - Comparison to vLLM
 
-\subsection{SGLang}
-\label{subsec:sglang}
+\subsection{Method Comparison}
+\label{subsec:quant-method-comparison}
 
-% TODO: Newer alternative
-% - Structured generation
-% - Performance claims
+% TODO: When to use each
+% | Method | Ecosystem | CPU Support | GPU Support | Quality |
+% | GGUF | llama.cpp | Yes | Yes | Good |
+% | GPTQ | HF/vLLM | No | Yes | Excellent |
+% | AWQ | vLLM | No | Yes | Excellent |
+% | BnB | HF | Limited | Yes | Good |
 
 % =============================================================================
-\section{Engine Comparison and Selection}
-\label{sec:engine-comparison}
+\section{Choosing Models for Your Use Case}
+\label{sec:choosing-models}
 % =============================================================================
 
 % TODO: Decision framework
 
-\subsection{Comparison Matrix}
-\label{subsec:engine-matrix}
+\subsection{Model Families Overview}
+\label{subsec:model-families}
 
-% TODO: Comprehensive comparison table
-% | Feature | Ollama | llama.cpp | vLLM |
-% | Ease of use | Excellent | Good | Moderate |
-% | Throughput | Low | Medium | High |
-% | CPU support | Yes | Yes | No |
-% | Batching | Basic | Basic | Continuous |
-% | etc. |
+% TODO: Current landscape
+% - Llama family (Meta)
+% - Mistral family
+% - Qwen family (Alibaba)
+% - Phi family (Microsoft)
+% - Gemma family (Google)
+% - Open-source vs open-weight
 
-\subsection{Decision Framework}
-\label{subsec:engine-decision}
+\subsection{Size vs Quality Trade-offs}
+\label{subsec:size-quality}
 
-% TODO: How to choose
-% - Development: Ollama
-% - CPU/Edge: llama.cpp
-% - Production GPU: vLLM
+% TODO: How to think about model size
+% - Benchmarks and their limitations
+% - Real-world testing importance
+% - Task-specific performance
+
+\subsection{Decision Matrix}
+\label{subsec:model-decision-matrix}
+
+% TODO: Practical recommendations
+% | Task | Min Size | Recommended | Notes |
+% | Simple chat | 1B | 7B | TinyLlama, Phi-3 |
+% | Code generation | 7B | 13B-33B | CodeLlama, Qwen-Coder |
+% | Complex reasoning | 13B | 70B | Llama 3.1, Mistral |
+% | Production | 7B-13B | 30B | Balance quality/cost |
 
 % =============================================================================
-\section{Hands-On: Running All Three Engines}
-\label{sec:hands-on-engines}
+\section{Where to Find Models}
+\label{sec:finding-models}
 % =============================================================================
 
-% TODO: Practical exercise
-% - Install and run each engine
-% - Same model, same prompts
-% - Measure throughput and latency
-% - Document differences
+% TODO: Model sources
+
+\subsection{Hugging Face Hub}
+\label{subsec:huggingface-hub}
+
+% TODO: The main repository
+% - Navigation
+% - Finding quantized versions
+% - Evaluating model cards
+% - TheBloke's quantizations
+
+\subsection{Ollama Library}
+\label{subsec:ollama-library}
+
+% TODO: Ollama's curated collection
+% - Pre-configured models
+% - Version management
+% - Custom modelfiles
+
+\subsection{Model Evaluation}
+\label{subsec:model-evaluation}
+
+% TODO: How to evaluate models
+% - Benchmark scores (limitations)
+% - Your own test suite
+% - A/B testing
+
+% =============================================================================
+\section{Building a Model Registry}
+\label{sec:model-registry}
+% =============================================================================
+
+% TODO: Introduce the concept for control plane
+
+\subsection{Why a Registry?}
+\label{subsec:why-registry}
+
+% TODO: Benefits
+% - Centralized metadata
+% - Version tracking
+% - Capability mapping
+% - Cost tracking
+
+\subsection{Registry Data Model}
+\label{subsec:registry-data-model}
+
+\begin{programcode}{Model Registry Interface (Go)}
+\begin{lstlisting}[language=Go]
+// ModelInfo represents metadata about a model
+type ModelInfo struct {
+    ID            string            `json:"id"`
+    Name          string            `json:"name"`
+    Family        string            `json:"family"`
+    Parameters    string            `json:"parameters"` // e.g., "7B"
+    Quantization  string            `json:"quantization"` // e.g., "Q4_K_M"
+    Format        string            `json:"format"` // gguf, safetensors
+    VRAMRequired  int64             `json:"vram_required_mb"`
+    ContextWindow int               `json:"context_window"`
+    Capabilities  []string          `json:"capabilities"`
+    CostPerToken  float64           `json:"cost_per_token"`
+    Metadata      map[string]string `json:"metadata"`
+}
+
+// ModelRegistry manages available models
+type ModelRegistry interface {
+    List(ctx context.Context) ([]ModelInfo, error)
+    Get(ctx context.Context, modelID string) (ModelInfo, error)
+    Register(ctx context.Context, model ModelInfo) error
+    FindByCapability(ctx context.Context, cap string) ([]ModelInfo, error)
+}
+\end{lstlisting}
+\end{programcode}
 
 % =============================================================================
 \section{Summary}
-\label{sec:ch04-summary}
+\label{sec:ch03-summary}
 % =============================================================================
 
 \begin{important}{Key Takeaways}
 \begin{itemize}
-\item Ollama excels at simplicity and developer experience
-\item llama.cpp provides maximum flexibility, especially for CPU inference
-\item vLLM delivers highest throughput for GPU-based production
-\item Engine choice depends on your deployment context and requirements
-\item All three expose HTTP APIs that your control plane can integrate with
+\item GGUF is the format of choice for flexible inference (CPU + GPU support)
+\item Q4 quantization provides the best quality/memory trade-off for most cases
+\item GPTQ/AWQ offer superior quality but require GPU-only inference
+\item Model choice depends on task complexity, resource constraints, and quality needs
+\item A model registry helps manage the growing ecosystem of options
 \end{itemize}
 \end{important}
 
@@ -358,21 +280,21 @@ docker run --gpus all \
 % =============================================================================
 
 \begin{prob}
-\label{prob:ch04-throughput-comparison}
-\textbf{Throughput Comparison}\\
-Using the same 7B model and a set of 100 test prompts, measure the requests-per-minute throughput of Ollama and vLLM. Run with 1, 5, and 10 concurrent clients. Graph and explain your results.
+\label{prob:ch03-quantization-comparison}
+\textbf{Quantization Quality Comparison}\\
+Download the same base model in Q4, Q5, and Q8 quantization. Using a consistent set of 20 prompts (10 factual, 10 creative), evaluate the output quality. Document your methodology and findings.
 \end{prob}
 
 \begin{prob}
-\label{prob:ch04-cpu-vs-gpu}
-\textbf{CPU vs GPU Performance}\\
-Using llama.cpp, compare inference speed on CPU-only versus GPU with different numbers of layers offloaded. Find the optimal split for your hardware and document the trade-offs.
+\label{prob:ch03-model-selection}
+\textbf{Model Selection for Use Case}\\
+You're building a customer support chatbot that needs to handle billing questions, technical troubleshooting, and appointment scheduling. You have 16GB VRAM available. Research and recommend a specific model, justifying your choice.
 \end{prob}
 
 \begin{prob}
-\label{prob:ch04-engine-abstraction}
-\textbf{Engine Abstraction Layer}\\
-Design a Go interface that abstracts over different inference engines. Implement two backends: one for Ollama and one for vLLM. Your interface should support both completion and chat modes.
+\label{prob:ch03-registry-implementation}
+\textbf{Model Registry Implementation}\\
+Implement the \texttt{ModelRegistry} interface using a JSON file as the backing store. Include methods for adding models, listing by capability, and finding the best model for a given VRAM constraint.
 \end{prob}
 
-\input{chapters/references04}
+\input{chapters/references03}

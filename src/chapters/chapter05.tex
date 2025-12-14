@@ -1,562 +1,356 @@
-%%%%%%%%%%%%%%%%%%%%% chapter05.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%% chapter04.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% Chapter 5: Building Control Plane v0.1
+% Chapter 4: Inference Engines
 %
 %%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Building Control Plane v0.1}
-\label{ch:control-plane-v01}
+\chapter{Inference Engines}
+\label{ch:inference-engines}
 
-\abstract*{This chapter is where theory meets practice. We build the first version of our Go-based control plane---a foundation that will evolve throughout the book. Control Plane v0.1 provides a single backend proxy, unified API, health checks, metrics collection, and Docker deployment with Prometheus and Grafana. By the end, you'll have a working inference system with observability built in from day one.}
+\abstract*{An inference engine is the core component that actually runs model computations. This chapter provides a deep dive into the major inference engines: Ollama for simplicity, llama.cpp for flexibility, and vLLM for production performance. We explain when to use each, how to configure them, and how they integrate with your control plane through their APIs.}
 
-\abstract{This chapter is where theory meets practice. We build the first version of our Go-based control plane---a foundation that will evolve throughout the book. Control Plane v0.1 provides a single backend proxy, unified API, health checks, metrics collection, and Docker deployment with Prometheus and Grafana. By the end, you'll have a working inference system with observability built in from day one.}
-
-% =============================================================================
-\section{Control Plane Architecture}
-\label{sec:cp-architecture}
-% =============================================================================
-
-% TODO: High-level architecture overview
-
-\subsection{What is a Control Plane?}
-\label{subsec:what-is-control-plane}
-
-% TODO: Define the concept
-% - Separating control from data flow
-% - Why abstraction matters
-% - Evolution path
-
-\subsection{v0.1 Capabilities}
-\label{subsec:v01-capabilities}
-
-% TODO: What we're building
-% - Single backend proxy
-% - Unified API (OpenAI-compatible)
-% - Health checks
-% - Metrics (Prometheus)
-% - Configuration management
-
-\subsection{System Architecture Diagram}
-\label{subsec:architecture-diagram}
-
-% TODO: ASCII or figure showing:
-% Client -> Control Plane -> Inference Engine (Ollama/vLLM)
-%                |
-%                v
-%           Prometheus -> Grafana
+\abstract{An inference engine is the core component that actually runs model computations. This chapter provides a deep dive into the major inference engines: Ollama for simplicity, llama.cpp for flexibility, and vLLM for production performance. We explain when to use each, how to configure them, and how they integrate with your control plane through their APIs.}
 
 % =============================================================================
-\section{Project Setup}
-\label{sec:project-setup}
+\section{The Role of Inference Engines}
+\label{sec:inference-engine-role}
 % =============================================================================
 
-% TODO: Setting up the Go project
+% TODO: What inference engines do
+% - Load models into memory
+% - Process requests
+% - Manage batching
+% - Handle streaming
+% - Optimize throughput
 
-\subsection{Go Module Initialization}
-\label{subsec:go-module}
+% =============================================================================
+\section{Ollama: Simplicity First}
+\label{sec:ollama}
+% =============================================================================
 
-\begin{programcode}{Project Structure}
+% TODO: Ollama deep dive
+
+\subsection{Architecture and Design Philosophy}
+\label{subsec:ollama-architecture}
+
+% TODO: How Ollama works
+% - Built on llama.cpp
+% - Model management abstraction
+% - REST API
+% - Modelfile system
+
+\subsection{Installation and Configuration}
+\label{subsec:ollama-install}
+
+% TODO: Setup instructions
+% - All platforms
+% - Configuration options
+% - Memory management
+% - GPU assignment
+
+\subsection{API Reference}
+\label{subsec:ollama-api}
+
+% TODO: Key endpoints
+% - /api/generate
+% - /api/chat
+% - /api/embeddings
+% - /api/tags
+% - /api/show
+
+\begin{programcode}{Ollama API Examples}
 \begin{lstlisting}[language=bash]
-# Initialize project
-mkdir inference-control-plane
-cd inference-control-plane
-go mod init github.com/yourorg/inference-control-plane
+# Generate completion
+curl http://localhost:11434/api/generate -d '{
+  "model": "llama3.2:7b",
+  "prompt": "Explain quantum computing",
+  "stream": false
+}'
 
-# Create directory structure
-mkdir -p cmd/server
-mkdir -p internal/{api,backend,config,health,metrics}
-mkdir -p deployments/docker
-mkdir -p configs
+# Chat completion
+curl http://localhost:11434/api/chat -d '{
+  "model": "llama3.2:7b",
+  "messages": [
+    {"role": "user", "content": "Hello!"}
+  ]
+}'
+
+# Generate embeddings
+curl http://localhost:11434/api/embeddings -d '{
+  "model": "nomic-embed-text",
+  "prompt": "Text to embed"
+}'
 \end{lstlisting}
 \end{programcode}
 
-\subsection{Dependencies}
-\label{subsec:dependencies}
+\subsection{When to Use Ollama}
+\label{subsec:ollama-when}
 
-% TODO: Key dependencies
-% - chi or standard library router
-% - prometheus client
-% - structured logging (slog)
-% - configuration (viper or similar)
+% TODO: Use cases
+% - Development and prototyping
+% - Single-user deployments
+% - Low complexity requirements
+% - When model management matters
 
-% =============================================================================
-\section{Core Interfaces}
-\label{sec:core-interfaces}
-% =============================================================================
+\begin{svgraybox}
+\textbf{Ollama Strengths:}
+\begin{itemize}
+\item Excellent developer experience
+\item Automatic model downloading and management
+\item Cross-platform (macOS, Linux, Windows)
+\item Good default configurations
+\end{itemize}
 
-% TODO: Define the foundational interfaces
-
-\subsection{Backend Interface}
-\label{subsec:backend-interface}
-
-\begin{programcode}{Backend Interface}
-\begin{lstlisting}[language=Go]
-// internal/backend/backend.go
-
-package backend
-
-import "context"
-
-// GenerateRequest represents an inference request
-type GenerateRequest struct {
-    Model       string   `json:"model"`
-    Prompt      string   `json:"prompt"`
-    MaxTokens   int      `json:"max_tokens,omitempty"`
-    Temperature float64  `json:"temperature,omitempty"`
-    Stream      bool     `json:"stream,omitempty"`
-    Stop        []string `json:"stop,omitempty"`
-}
-
-// GenerateResponse represents an inference response
-type GenerateResponse struct {
-    ID      string `json:"id"`
-    Object  string `json:"object"`
-    Created int64  `json:"created"`
-    Model   string `json:"model"`
-    Choices []Choice `json:"choices"`
-    Usage   Usage  `json:"usage"`
-}
-
-type Choice struct {
-    Index        int    `json:"index"`
-    Text         string `json:"text,omitempty"`
-    Message      *Message `json:"message,omitempty"`
-    FinishReason string `json:"finish_reason"`
-}
-
-type Message struct {
-    Role    string `json:"role"`
-    Content string `json:"content"`
-}
-
-type Usage struct {
-    PromptTokens     int `json:"prompt_tokens"`
-    CompletionTokens int `json:"completion_tokens"`
-    TotalTokens      int `json:"total_tokens"`
-}
-
-// Backend defines the interface for inference backends
-type Backend interface {
-    // Generate performs text generation
-    Generate(ctx context.Context, req GenerateRequest) (GenerateResponse, error)
-
-    // Health checks if the backend is healthy
-    Health(ctx context.Context) error
-
-    // Name returns the backend identifier
-    Name() string
-}
-\end{lstlisting}
-\end{programcode}
-
-\subsection{Health Interface}
-\label{subsec:health-interface}
-
-\begin{programcode}{Health Check Interface}
-\begin{lstlisting}[language=Go]
-// internal/health/health.go
-
-package health
-
-import "context"
-
-// Status represents health status
-type Status string
-
-const (
-    StatusHealthy   Status = "healthy"
-    StatusDegraded  Status = "degraded"
-    StatusUnhealthy Status = "unhealthy"
-)
-
-// CheckResult contains a health check result
-type CheckResult struct {
-    Name    string `json:"name"`
-    Status  Status `json:"status"`
-    Message string `json:"message,omitempty"`
-    Latency int64  `json:"latency_ms"`
-}
-
-// Checker defines a health check component
-type Checker interface {
-    Check(ctx context.Context) CheckResult
-    Name() string
-}
-
-// Aggregator combines multiple health checks
-type Aggregator interface {
-    Register(checker Checker)
-    CheckAll(ctx context.Context) []CheckResult
-    OverallStatus(ctx context.Context) Status
-}
-\end{lstlisting}
-\end{programcode}
+\textbf{Ollama Limitations:}
+\begin{itemize}
+\item Limited batching capabilities
+\item No continuous batching
+\item Single-model focus
+\item Less production tuning options
+\end{itemize}
+\end{svgraybox}
 
 % =============================================================================
-\section{Implementing the Ollama Backend}
-\label{sec:ollama-backend}
+\section{llama.cpp: Maximum Flexibility}
+\label{sec:llama-cpp}
 % =============================================================================
 
-% TODO: Concrete implementation
+% TODO: llama.cpp deep dive
 
-\begin{programcode}{Ollama Backend Implementation}
-\begin{lstlisting}[language=Go]
-// internal/backend/ollama.go
+\subsection{Architecture}
+\label{subsec:llama-cpp-architecture}
 
-package backend
+% TODO: How llama.cpp works
+% - C/C++ implementation
+% - Multi-backend (CPU, CUDA, Metal, etc.)
+% - GGUF format native
+% - server binary
 
-import (
-    "bytes"
-    "context"
-    "encoding/json"
-    "fmt"
-    "net/http"
-    "time"
-)
+\subsection{Building and Installation}
+\label{subsec:llama-cpp-install}
 
-type OllamaBackend struct {
-    baseURL    string
-    httpClient *http.Client
-    model      string
-}
+% TODO: Compilation options
+% - CPU-only build
+% - CUDA build
+% - Metal build
+% - Compilation flags
 
-func NewOllamaBackend(baseURL, model string) *OllamaBackend {
-    return &OllamaBackend{
-        baseURL: baseURL,
-        model:   model,
-        httpClient: &http.Client{
-            Timeout: 5 * time.Minute,
-        },
-    }
-}
+\subsection{Server Mode}
+\label{subsec:llama-cpp-server}
 
-func (b *OllamaBackend) Name() string {
-    return "ollama"
-}
+% TODO: Running as a server
+% - Command line options
+% - API compatibility (OpenAI-like)
+% - Configuration parameters
 
-func (b *OllamaBackend) Generate(ctx context.Context, req GenerateRequest) (GenerateResponse, error) {
-    // Convert to Ollama format
-    ollamaReq := map[string]interface{}{
-        "model":  req.Model,
-        "prompt": req.Prompt,
-        "stream": false,
-    }
-
-    if req.MaxTokens > 0 {
-        ollamaReq["num_predict"] = req.MaxTokens
-    }
-    if req.Temperature > 0 {
-        ollamaReq["temperature"] = req.Temperature
-    }
-
-    body, err := json.Marshal(ollamaReq)
-    if err != nil {
-        return GenerateResponse{}, fmt.Errorf("marshal request: %w", err)
-    }
-
-    httpReq, err := http.NewRequestWithContext(
-        ctx,
-        http.MethodPost,
-        b.baseURL+"/api/generate",
-        bytes.NewReader(body),
-    )
-    if err != nil {
-        return GenerateResponse{}, fmt.Errorf("create request: %w", err)
-    }
-    httpReq.Header.Set("Content-Type", "application/json")
-
-    resp, err := b.httpClient.Do(httpReq)
-    if err != nil {
-        return GenerateResponse{}, fmt.Errorf("execute request: %w", err)
-    }
-    defer resp.Body.Close()
-
-    if resp.StatusCode != http.StatusOK {
-        return GenerateResponse{}, fmt.Errorf("ollama returned status %d", resp.StatusCode)
-    }
-
-    var ollamaResp struct {
-        Response string `json:"response"`
-    }
-    if err := json.NewDecoder(resp.Body).Decode(&ollamaResp); err != nil {
-        return GenerateResponse{}, fmt.Errorf("decode response: %w", err)
-    }
-
-    // Convert to standard format
-    return GenerateResponse{
-        ID:      fmt.Sprintf("gen-%d", time.Now().UnixNano()),
-        Object:  "text_completion",
-        Created: time.Now().Unix(),
-        Model:   req.Model,
-        Choices: []Choice{{
-            Index:        0,
-            Text:         ollamaResp.Response,
-            FinishReason: "stop",
-        }},
-    }, nil
-}
-
-func (b *OllamaBackend) Health(ctx context.Context) error {
-    req, err := http.NewRequestWithContext(ctx, http.MethodGet, b.baseURL+"/api/tags", nil)
-    if err != nil {
-        return err
-    }
-
-    resp, err := b.httpClient.Do(req)
-    if err != nil {
-        return err
-    }
-    defer resp.Body.Close()
-
-    if resp.StatusCode != http.StatusOK {
-        return fmt.Errorf("unhealthy: status %d", resp.StatusCode)
-    }
-    return nil
-}
-\end{lstlisting}
-\end{programcode}
-
-% =============================================================================
-\section{API Server}
-\label{sec:api-server}
-% =============================================================================
-
-% TODO: HTTP API implementation
-
-\subsection{Router Setup}
-\label{subsec:router-setup}
-
-% TODO: Setting up routes
-% - POST /v1/completions
-% - POST /v1/chat/completions
-% - GET /health
-% - GET /metrics
-
-\subsection{Request Handling}
-\label{subsec:request-handling}
-
-% TODO: Middleware and handlers
-
-% =============================================================================
-\section{Metrics with Prometheus}
-\label{sec:prometheus-metrics}
-% =============================================================================
-
-% TODO: Metrics implementation
-
-\subsection{Key Metrics to Track}
-\label{subsec:key-metrics}
-
-% TODO: What to measure
-% - Request count
-% - Request latency
-% - Token throughput
-% - Error rates
-% - Backend health
-
-\begin{programcode}{Metrics Definition}
-\begin{lstlisting}[language=Go]
-// internal/metrics/metrics.go
-
-package metrics
-
-import (
-    "github.com/prometheus/client_golang/prometheus"
-    "github.com/prometheus/client_golang/prometheus/promauto"
-)
-
-var (
-    RequestsTotal = promauto.NewCounterVec(
-        prometheus.CounterOpts{
-            Name: "inference_requests_total",
-            Help: "Total number of inference requests",
-        },
-        []string{"model", "status"},
-    )
-
-    RequestDuration = promauto.NewHistogramVec(
-        prometheus.HistogramOpts{
-            Name:    "inference_request_duration_seconds",
-            Help:    "Request duration in seconds",
-            Buckets: []float64{0.1, 0.5, 1, 2, 5, 10, 30, 60},
-        },
-        []string{"model"},
-    )
-
-    TokensGenerated = promauto.NewCounterVec(
-        prometheus.CounterOpts{
-            Name: "inference_tokens_generated_total",
-            Help: "Total tokens generated",
-        },
-        []string{"model"},
-    )
-
-    BackendHealth = promauto.NewGaugeVec(
-        prometheus.GaugeOpts{
-            Name: "inference_backend_health",
-            Help: "Backend health status (1 = healthy, 0 = unhealthy)",
-        },
-        []string{"backend"},
-    )
-)
-\end{lstlisting}
-\end{programcode}
-
-% =============================================================================
-\section{Docker Deployment}
-\label{sec:docker-deployment}
-% =============================================================================
-
-% TODO: Docker setup
-
-\subsection{Dockerfile}
-\label{subsec:dockerfile}
-
-% TODO: Multi-stage build
-
-\subsection{Docker Compose Stack}
-\label{subsec:docker-compose}
-
-\begin{programcode}{Docker Compose}
+\begin{programcode}{llama.cpp Server Launch}
 \begin{lstlisting}[language=bash]
-# deployments/docker/docker-compose.yml
+# Basic launch
+./llama-server \
+  -m models/llama-7b-q4_k_m.gguf \
+  --host 0.0.0.0 \
+  --port 8080 \
+  -c 4096 \
+  -ngl 35
 
-version: '3.8'
-
-services:
-  control-plane:
-    build:
-      context: ../..
-      dockerfile: deployments/docker/Dockerfile
-    ports:
-      - "8080:8080"
-    environment:
-      - BACKEND_URL=http://ollama:11434
-      - METRICS_PORT=9090
-    depends_on:
-      - ollama
-      - prometheus
-
-  ollama:
-    image: ollama/ollama:latest
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-
-  prometheus:
-    image: prom/prometheus:latest
-    ports:
-      - "9091:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
-
-  grafana:
-    image: grafana/grafana:latest
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning
-
-volumes:
-  ollama_data:
-  prometheus_data:
-  grafana_data:
+# Key parameters:
+# -m: Model path
+# -c: Context size
+# -ngl: Number of GPU layers (for partial offload)
+# --host/--port: Network binding
 \end{lstlisting}
 \end{programcode}
 
-% =============================================================================
-\section{Grafana Dashboard}
-\label{sec:grafana-dashboard}
-% =============================================================================
+\subsection{Advanced Configuration}
+\label{subsec:llama-cpp-advanced}
 
-% TODO: Dashboard creation
-% - Request rate panel
-% - Latency percentiles
-% - Error rate
-% - Token throughput
-% - Backend health
+% TODO: Performance tuning
+% - Layer offloading
+% - Thread configuration
+% - Memory mapping
+% - Batch size tuning
 
-% =============================================================================
-\section{Testing the Control Plane}
-\label{sec:testing-control-plane}
-% =============================================================================
+\subsection{When to Use llama.cpp}
+\label{subsec:llama-cpp-when}
 
-% TODO: Integration testing
-% - Starting the stack
-% - Making test requests
-% - Verifying metrics
-% - Checking dashboards
+% TODO: Use cases
+% - CPU inference
+% - Mixed CPU/GPU
+% - Custom deployments
+% - Resource-constrained environments
+% - Edge deployments
 
 % =============================================================================
-\section{Configuration Management}
-\label{sec:configuration}
+\section{vLLM: Production Performance}
+\label{sec:vllm}
 % =============================================================================
 
-% TODO: Config file and environment variables
+% TODO: vLLM deep dive
 
-\begin{programcode}{Configuration}
-\begin{lstlisting}[language=Go]
-// internal/config/config.go
+\subsection{Key Innovation: Paged Attention}
+\label{subsec:vllm-paged-attention}
 
-package config
+% TODO: Explain paged attention
+% - Memory fragmentation problem
+% - How paged attention solves it
+% - Throughput improvements
 
-type Config struct {
-    Server  ServerConfig  `yaml:"server"`
-    Backend BackendConfig `yaml:"backend"`
-    Metrics MetricsConfig `yaml:"metrics"`
-}
+\subsection{Continuous Batching}
+\label{subsec:vllm-continuous-batching}
 
-type ServerConfig struct {
-    Host string `yaml:"host" env:"SERVER_HOST" default:"0.0.0.0"`
-    Port int    `yaml:"port" env:"SERVER_PORT" default:"8080"`
-}
+% TODO: Dynamic batching explanation
+% - Traditional batching limitations
+% - How continuous batching works
+% - Throughput vs latency trade-offs
 
-type BackendConfig struct {
-    Type    string `yaml:"type" env:"BACKEND_TYPE" default:"ollama"`
-    URL     string `yaml:"url" env:"BACKEND_URL" default:"http://localhost:11434"`
-    Model   string `yaml:"model" env:"BACKEND_MODEL" default:"llama3.2:7b"`
-    Timeout int    `yaml:"timeout" env:"BACKEND_TIMEOUT" default:"300"`
-}
+\subsection{Installation and Setup}
+\label{subsec:vllm-install}
 
-type MetricsConfig struct {
-    Enabled bool   `yaml:"enabled" env:"METRICS_ENABLED" default:"true"`
-    Path    string `yaml:"path" env:"METRICS_PATH" default:"/metrics"`
-}
+% TODO: Setup instructions
+% - pip install
+% - Docker deployment
+% - GPU requirements
+
+\begin{programcode}{vLLM Server Launch}
+\begin{lstlisting}[language=bash]
+# Using Python API
+python -m vllm.entrypoints.openai.api_server \
+  --model meta-llama/Llama-3.2-7b-instruct \
+  --dtype float16 \
+  --api-key token-abc123 \
+  --port 8000
+
+# Docker deployment
+docker run --gpus all \
+  -v ~/.cache/huggingface:/root/.cache/huggingface \
+  -p 8000:8000 \
+  vllm/vllm-openai:latest \
+  --model meta-llama/Llama-3.2-7b-instruct
 \end{lstlisting}
 \end{programcode}
+
+\subsection{API and OpenAI Compatibility}
+\label{subsec:vllm-api}
+
+% TODO: API reference
+% - OpenAI-compatible endpoints
+% - /v1/completions
+% - /v1/chat/completions
+% - /v1/embeddings
+
+\subsection{Performance Tuning}
+\label{subsec:vllm-tuning}
+
+% TODO: Optimization parameters
+% - tensor-parallel-size
+% - max-model-len
+% - gpu-memory-utilization
+% - dtype options
+
+\subsection{When to Use vLLM}
+\label{subsec:vllm-when}
+
+% TODO: Use cases
+% - High-throughput production
+% - Multiple concurrent users
+% - When latency matters
+% - Multi-GPU deployments
+
+\begin{svgraybox}
+\textbf{vLLM Strengths:}
+\begin{itemize}
+\item 2-4x higher throughput than naive implementations
+\item Continuous batching for efficient GPU utilization
+\item OpenAI API compatibility
+\item Multi-GPU support (tensor parallelism)
+\end{itemize}
+
+\textbf{vLLM Limitations:}
+\begin{itemize}
+\item GPU-only (no CPU inference)
+\item More complex setup
+\item Higher memory overhead
+\item Limited quantization support (improving)
+\end{itemize}
+\end{svgraybox}
+
+% =============================================================================
+\section{Other Engines Worth Knowing}
+\label{sec:other-engines}
+% =============================================================================
+
+\subsection{TensorRT-LLM}
+\label{subsec:tensorrt-llm}
+
+% TODO: NVIDIA's optimized engine
+% - When to use
+% - Strengths and limitations
+
+\subsection{Text Generation Inference (TGI)}
+\label{subsec:tgi}
+
+% TODO: HuggingFace's engine
+% - When to use
+% - Comparison to vLLM
+
+\subsection{SGLang}
+\label{subsec:sglang}
+
+% TODO: Newer alternative
+% - Structured generation
+% - Performance claims
+
+% =============================================================================
+\section{Engine Comparison and Selection}
+\label{sec:engine-comparison}
+% =============================================================================
+
+% TODO: Decision framework
+
+\subsection{Comparison Matrix}
+\label{subsec:engine-matrix}
+
+% TODO: Comprehensive comparison table
+% | Feature | Ollama | llama.cpp | vLLM |
+% | Ease of use | Excellent | Good | Moderate |
+% | Throughput | Low | Medium | High |
+% | CPU support | Yes | Yes | No |
+% | Batching | Basic | Basic | Continuous |
+% | etc. |
+
+\subsection{Decision Framework}
+\label{subsec:engine-decision}
+
+% TODO: How to choose
+% - Development: Ollama
+% - CPU/Edge: llama.cpp
+% - Production GPU: vLLM
+
+% =============================================================================
+\section{Hands-On: Running All Three Engines}
+\label{sec:hands-on-engines}
+% =============================================================================
+
+% TODO: Practical exercise
+% - Install and run each engine
+% - Same model, same prompts
+% - Measure throughput and latency
+% - Document differences
 
 % =============================================================================
 \section{Summary}
-\label{sec:ch05-summary}
+\label{sec:ch04-summary}
 % =============================================================================
 
 \begin{important}{Key Takeaways}
 \begin{itemize}
-\item Control Plane v0.1 provides abstraction over inference backends
-\item Interface-driven design enables future extensibility
-\item Observability (metrics + health checks) is built-in from day one
-\item Docker Compose provides a complete development environment
-\item This foundation will evolve throughout the book
+\item Ollama excels at simplicity and developer experience
+\item llama.cpp provides maximum flexibility, especially for CPU inference
+\item vLLM delivers highest throughput for GPU-based production
+\item Engine choice depends on your deployment context and requirements
+\item All three expose HTTP APIs that your control plane can integrate with
 \end{itemize}
 \end{important}
-
-\begin{svgraybox}
-\textbf{What's Next:}
-
-In the optional Chapter 5.5, we'll add browser-based inference for zero-cost deployments. In Part II, we'll enhance this control plane with authentication, rate limiting, caching, and multi-model routing for 30B+ production deployments.
-\end{svgraybox}
 
 % =============================================================================
 \section*{Problems}
@@ -564,21 +358,21 @@ In the optional Chapter 5.5, we'll add browser-based inference for zero-cost dep
 % =============================================================================
 
 \begin{prob}
-\label{prob:ch05-vllm-backend}
-\textbf{vLLM Backend Implementation}\\
-Implement a \texttt{VLLMBackend} struct that satisfies the \texttt{Backend} interface. It should communicate with vLLM's OpenAI-compatible API.
+\label{prob:ch04-throughput-comparison}
+\textbf{Throughput Comparison}\\
+Using the same 7B model and a set of 100 test prompts, measure the requests-per-minute throughput of Ollama and vLLM. Run with 1, 5, and 10 concurrent clients. Graph and explain your results.
 \end{prob}
 
 \begin{prob}
-\label{prob:ch05-streaming}
-\textbf{Streaming Support}\\
-Extend the \texttt{Backend} interface to support streaming responses. Implement streaming for the Ollama backend.
+\label{prob:ch04-cpu-vs-gpu}
+\textbf{CPU vs GPU Performance}\\
+Using llama.cpp, compare inference speed on CPU-only versus GPU with different numbers of layers offloaded. Find the optimal split for your hardware and document the trade-offs.
 \end{prob}
 
 \begin{prob}
-\label{prob:ch05-dashboard}
-\textbf{Custom Grafana Dashboard}\\
-Create a Grafana dashboard that displays: (a) request rate over time, (b) p50/p95/p99 latency, (c) tokens per second, and (d) error rate. Export the dashboard as JSON.
+\label{prob:ch04-engine-abstraction}
+\textbf{Engine Abstraction Layer}\\
+Design a Go interface that abstracts over different inference engines. Implement two backends: one for Ollama and one for vLLM. Your interface should support both completion and chat modes.
 \end{prob}
 
-\input{chapters/references05}
+\input{chapters/references04}

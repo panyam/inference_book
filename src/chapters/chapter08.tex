@@ -1,265 +1,276 @@
-%%%%%%%%%%%%%%%%%%%%% chapter08.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%% chapter07.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% Chapter 8: Response Caching
+% Chapter 7: Rate Limiting and Quotas
 %
 %%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Response Caching}
-\label{ch:caching}
+\chapter{Rate Limiting and Quotas}
+\label{ch:rate-limiting}
 
-\abstract*{Inference is expensive. Smart caching can dramatically reduce costs for repeated or similar queries. This chapter covers exact match caching, semantic caching with embeddings, cache invalidation strategies, and cache-aware routing. We implement a caching layer that integrates with the control plane while respecting the non-deterministic nature of LLM outputs.}
+\abstract*{Protecting your inference infrastructure requires thoughtful rate limiting. This chapter covers token bucket and sliding window algorithms, per-user and per-tier quotas, burst handling, and graceful degradation. We implement a flexible rate limiting system that integrates with authentication and provides clear feedback to users.}
 
-\abstract{Inference is expensive. Smart caching can dramatically reduce costs for repeated or similar queries. This chapter covers exact match caching, semantic caching with embeddings, cache invalidation strategies, and cache-aware routing. We implement a caching layer that integrates with the control plane while respecting the non-deterministic nature of LLM outputs.}
-
-% =============================================================================
-\section{The Case for Caching}
-\label{sec:caching-case}
-% =============================================================================
-
-% TODO: Why cache inference results
-% - Inference is expensive
-% - Many queries repeat
-% - Latency improvement
-% - Cost reduction
-
-\subsection{When Caching Makes Sense}
-\label{subsec:when-caching}
-
-% TODO: Good candidates
-% - FAQ-style queries
-% - Code documentation
-% - Product descriptions
-% - Classification tasks
-
-\subsection{When Caching Doesn't Work}
-\label{subsec:when-not-caching}
-
-% TODO: Poor candidates
-% - Creative writing (uniqueness valued)
-% - Time-sensitive queries
-% - Personalized responses
-% - Low repeat rate
+\abstract{Protecting your inference infrastructure requires thoughtful rate limiting. This chapter covers token bucket and sliding window algorithms, per-user and per-tier quotas, burst handling, and graceful degradation. We implement a flexible rate limiting system that integrates with authentication and provides clear feedback to users.}
 
 % =============================================================================
-\section{Exact Match Caching}
-\label{sec:exact-caching}
+\section{Why Rate Limiting?}
+\label{sec:why-rate-limiting}
 % =============================================================================
 
-% TODO: Simple exact match
+% TODO: Motivation
+% - Protect infrastructure
+% - Fair resource sharing
+% - Cost management
+% - Prevent abuse
+% - SLA enforcement
 
-\subsection{Cache Key Design}
-\label{subsec:cache-key-design}
+% =============================================================================
+\section{Rate Limiting Algorithms}
+\label{sec:rl-algorithms}
+% =============================================================================
 
-% TODO: What goes in the key
-% - Prompt
-% - Model
-% - Temperature (if 0)
-% - System prompt
+\subsection{Token Bucket}
+\label{subsec:token-bucket}
 
-\begin{programcode}{Cache Key Generation}
+% TODO: Token bucket explained
+% - How it works
+% - Allows bursting
+% - Implementation
+
+\subsection{Sliding Window}
+\label{subsec:sliding-window}
+
+% TODO: Sliding window
+% - Fixed vs sliding
+% - Memory considerations
+% - Implementation
+
+\subsection{Leaky Bucket}
+\label{subsec:leaky-bucket}
+
+% TODO: Leaky bucket
+% - Constant rate output
+% - When to use
+
+\subsection{Algorithm Comparison}
+\label{subsec:algorithm-comparison}
+
+% TODO: Comparison table
+
+% =============================================================================
+\section{Designing Rate Limit Policies}
+\label{sec:rl-policies}
+% =============================================================================
+
+% TODO: Policy design
+
+\subsection{Per-User Limits}
+\label{subsec:per-user-limits}
+
+% TODO: User-based limits
+% - Requests per minute
+% - Tokens per minute
+% - Concurrent requests
+
+\subsection{Per-Tier Limits}
+\label{subsec:per-tier-limits}
+
+% TODO: Tier-based differentiation
+% - Free tier
+% - Pro tier
+% - Enterprise tier
+
+\begin{programcode}{Rate Limit Configuration}
 \begin{lstlisting}[language=Go]
-// internal/cache/key.go
+// internal/ratelimit/config.go
 
-package cache
+type RateLimitConfig struct {
+    Tiers map[string]TierLimits `yaml:"tiers"`
+}
+
+type TierLimits struct {
+    RequestsPerMinute    int `yaml:"requests_per_minute"`
+    TokensPerMinute      int `yaml:"tokens_per_minute"`
+    TokensPerDay         int `yaml:"tokens_per_day"`
+    MaxConcurrentReqs    int `yaml:"max_concurrent_requests"`
+    MaxTokensPerRequest  int `yaml:"max_tokens_per_request"`
+    BurstMultiplier      float64 `yaml:"burst_multiplier"`
+}
+
+var DefaultTierLimits = map[string]TierLimits{
+    "free": {
+        RequestsPerMinute:    10,
+        TokensPerMinute:      1000,
+        TokensPerDay:         10000,
+        MaxConcurrentReqs:    2,
+        MaxTokensPerRequest:  500,
+        BurstMultiplier:      1.5,
+    },
+    "pro": {
+        RequestsPerMinute:    60,
+        TokensPerMinute:      10000,
+        TokensPerDay:         500000,
+        MaxConcurrentReqs:    10,
+        MaxTokensPerRequest:  4000,
+        BurstMultiplier:      2.0,
+    },
+    "enterprise": {
+        RequestsPerMinute:    1000,
+        TokensPerMinute:      100000,
+        TokensPerDay:         10000000,
+        MaxConcurrentReqs:    100,
+        MaxTokensPerRequest:  32000,
+        BurstMultiplier:      3.0,
+    },
+}
+\end{lstlisting}
+\end{programcode}
+
+% =============================================================================
+\section{Implementing Rate Limiting}
+\label{sec:rl-implementation}
+% =============================================================================
+
+% TODO: Go implementation
+
+\begin{programcode}{Rate Limiter Interface}
+\begin{lstlisting}[language=Go]
+// internal/ratelimit/limiter.go
+
+package ratelimit
 
 import (
-    "crypto/sha256"
-    "encoding/hex"
-    "encoding/json"
+    "context"
+    "time"
 )
 
-type CacheKey struct {
-    Model       string  `json:"model"`
-    Prompt      string  `json:"prompt"`
-    SystemPrompt string `json:"system_prompt,omitempty"`
-    Temperature float64 `json:"temperature"`
-    MaxTokens   int     `json:"max_tokens"`
+type Decision struct {
+    Allowed       bool
+    Remaining     int
+    ResetAt       time.Time
+    RetryAfter    time.Duration
+    LimitedBy     string // "rpm", "tpm", "concurrent", etc.
 }
 
-func (k CacheKey) Hash() string {
-    data, _ := json.Marshal(k)
-    hash := sha256.Sum256(data)
-    return hex.EncodeToString(hash[:])
-}
+type Limiter interface {
+    // Allow checks if a request should be allowed
+    Allow(ctx context.Context, userID string, tier string) Decision
 
-func IsCacheable(req backend.GenerateRequest) bool {
-    // Only cache deterministic requests
-    return req.Temperature == 0 || req.Temperature <= 0.1
+    // AllowN checks if N tokens can be consumed
+    AllowN(ctx context.Context, userID string, tier string, tokens int) Decision
+
+    // Release releases a concurrent request slot
+    Release(ctx context.Context, userID string)
 }
 \end{lstlisting}
 \end{programcode}
 
-\subsection{Implementation}
-\label{subsec:exact-cache-impl}
+\subsection{Redis-based Implementation}
+\label{subsec:redis-implementation}
 
-% TODO: Simple exact match implementation
+% TODO: Distributed rate limiting
+% - Why Redis
+% - Lua scripts for atomicity
+% - Implementation
+
+\subsection{In-Memory Implementation}
+\label{subsec:inmemory-implementation}
+
+% TODO: Single-node option
+% - When appropriate
+% - sync.Map approach
 
 % =============================================================================
-\section{Semantic Caching}
-\label{sec:semantic-caching}
+\section{Rate Limiting Middleware}
+\label{sec:rl-middleware}
 % =============================================================================
 
-% TODO: The smart approach
+% TODO: HTTP middleware
 
-\subsection{How Semantic Caching Works}
-\label{subsec:semantic-how}
-
-% TODO: Embedding-based similarity
-% - Generate embeddings for prompts
-% - Store in vector database
-% - Find similar queries
-% - Return cached response if similar enough
-
-\subsection{Embedding Models for Caching}
-\label{subsec:cache-embeddings}
-
-% TODO: Choosing embedding models
-% - Small, fast models
-% - Sentence transformers
-% - OpenAI embeddings
-% - Local options
-
-\subsection{Similarity Thresholds}
-\label{subsec:similarity-thresholds}
-
-% TODO: Setting thresholds
-% - Too high: poor hit rate
-% - Too low: wrong responses
-% - Task-dependent tuning
-
-\begin{programcode}{Semantic Cache Interface}
+\begin{programcode}{Rate Limit Middleware}
 \begin{lstlisting}[language=Go]
-// internal/cache/semantic.go
+// internal/ratelimit/middleware.go
 
-type SemanticCache interface {
-    // Get finds semantically similar cached response
-    Get(ctx context.Context, key CacheKey) (*CacheEntry, error)
+func RateLimitMiddleware(limiter Limiter) func(http.Handler) http.Handler {
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            user := auth.GetUser(r.Context())
+            if user == nil {
+                http.Error(w, "unauthorized", http.StatusUnauthorized)
+                return
+            }
 
-    // Set stores response with embedding
-    Set(ctx context.Context, key CacheKey, response string, ttl time.Duration) error
+            decision := limiter.Allow(r.Context(), user.ID, user.Tier)
 
-    // SetThreshold sets similarity threshold (0.0 - 1.0)
-    SetThreshold(threshold float64)
-}
+            // Set rate limit headers
+            w.Header().Set("X-RateLimit-Limit", fmt.Sprintf("%d", decision.Limit))
+            w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", decision.Remaining))
+            w.Header().Set("X-RateLimit-Reset", fmt.Sprintf("%d", decision.ResetAt.Unix()))
 
-type CacheEntry struct {
-    Response   string
-    Similarity float64  // How similar the query was
-    CachedAt   time.Time
-    HitCount   int
-}
+            if !decision.Allowed {
+                w.Header().Set("Retry-After", fmt.Sprintf("%d", int(decision.RetryAfter.Seconds())))
+                http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
+                return
+            }
 
-type VectorSemanticCache struct {
-    embedder   Embedder
-    vectorDB   VectorStore
-    threshold  float64
-    exactCache Cache // Fallback to exact match
+            next.ServeHTTP(w, r)
+        })
+    }
 }
 \end{lstlisting}
 \end{programcode}
 
 % =============================================================================
-\section{Cache Storage Options}
-\label{sec:cache-storage}
+\section{Token-Based Rate Limiting}
+\label{sec:token-rate-limiting}
 % =============================================================================
 
-% TODO: Where to store cache
-
-\subsection{Redis}
-\label{subsec:redis-cache}
-
-% TODO: Redis for exact match
-% - Fast
-% - TTL support
-% - Distributed
-
-\subsection{Vector Databases}
-\label{subsec:vector-db-cache}
-
-% TODO: Vector DBs for semantic
-% - Qdrant
-% - Milvus
-% - Pinecone
-% - pgvector
-
-\subsection{Hybrid Approach}
-\label{subsec:hybrid-cache}
-
-% TODO: Combining both
-% - Exact match first (Redis)
-% - Semantic match second (Vector DB)
+% TODO: Limiting by tokens, not just requests
+% - Why tokens matter for LLMs
+% - Pre-request estimation
+% - Post-request adjustment
 
 % =============================================================================
-\section{Cache Invalidation}
-\label{sec:cache-invalidation}
+\section{Handling Bursts}
+\label{sec:handling-bursts}
 % =============================================================================
 
-% TODO: The hard problem
-
-\subsection{TTL-Based Invalidation}
-\label{subsec:ttl-invalidation}
-
-% TODO: Time-based expiry
-% - Simple and effective
-% - Task-appropriate TTLs
-
-\subsection{Model-Based Invalidation}
-\label{subsec:model-invalidation}
-
-% TODO: Invalidate on model change
-% - Model version tracking
-% - Automatic invalidation
-
-\subsection{Manual Invalidation}
-\label{subsec:manual-invalidation}
-
-% TODO: Admin controls
-% - Flush specific entries
-% - Bulk invalidation
+% TODO: Burst strategies
+% - Allow short bursts
+% - Queuing excess requests
+% - Graceful degradation
 
 % =============================================================================
-\section{Cache Warming}
-\label{sec:cache-warming}
+\section{Quota Management}
+\label{sec:quota-management}
 % =============================================================================
 
-% TODO: Proactive caching
-% - Pre-computing common queries
-% - Background generation
-% - Traffic pattern analysis
+% TODO: Daily/monthly quotas
+% - Tracking usage
+% - Alerting on approach
+% - Hard vs soft limits
 
 % =============================================================================
-\section{Metrics and Monitoring}
-\label{sec:cache-metrics}
+\section{User Feedback}
+\label{sec:rl-user-feedback}
 % =============================================================================
 
-% TODO: What to track
-% - Hit rate
-% - Miss rate
-% - Similarity distribution
-% - Cost savings
-
-% =============================================================================
-\section{Integration with Control Plane}
-\label{sec:cache-integration}
-% =============================================================================
-
-% TODO: Wiring it together
-% - Cache middleware
-% - Configuration
-% - Bypass options
+% TODO: Clear communication
+% - Rate limit headers
+% - Error messages
+% - Dashboard visibility
 
 % =============================================================================
 \section{Summary}
-\label{sec:ch08-summary}
+\label{sec:ch07-summary}
 % =============================================================================
 
 \begin{important}{Key Takeaways}
 \begin{itemize}
-\item Caching can reduce inference costs by 30-70\% for suitable workloads
-\item Exact match is simple but limited; semantic caching is more powerful
-\item Only cache deterministic requests (temperature $\approx$ 0)
-\item TTL-based invalidation is simple and usually sufficient
-\item Track cache hit rates and cost savings
+\item Rate limiting protects infrastructure and ensures fair usage
+\item Token bucket allows bursting while maintaining average rate
+\item Token-based limits matter more than request counts for LLMs
+\item Clear headers and error messages improve user experience
+\item Redis enables distributed rate limiting across multiple nodes
 \end{itemize}
 \end{important}
 
@@ -269,21 +280,21 @@ type VectorSemanticCache struct {
 % =============================================================================
 
 \begin{prob}
-\label{prob:ch08-exact-cache}
-\textbf{Exact Match Cache}\\
-Implement an exact match cache using Redis. Include TTL support and metrics tracking.
+\label{prob:ch07-token-bucket}
+\textbf{Token Bucket Implementation}\\
+Implement a token bucket rate limiter from scratch. Support configurable fill rate, bucket size, and burst capacity.
 \end{prob}
 
 \begin{prob}
-\label{prob:ch08-semantic-cache}
-\textbf{Semantic Cache}\\
-Build a semantic cache using sentence embeddings and a vector database. Implement threshold tuning based on hit rate vs accuracy trade-off.
+\label{prob:ch07-redis-limiter}
+\textbf{Redis Rate Limiter}\\
+Implement a distributed rate limiter using Redis. Use Lua scripts to ensure atomic check-and-decrement operations.
 \end{prob}
 
 \begin{prob}
-\label{prob:ch08-cache-analysis}
-\textbf{Cache Effectiveness Analysis}\\
-Given a dataset of 10,000 prompts, analyze the potential effectiveness of exact vs semantic caching. Calculate expected hit rates and cost savings.
+\label{prob:ch07-quota-tracker}
+\textbf{Quota Tracking System}\\
+Build a system that tracks daily and monthly token quotas per user. Include alerts when users approach their limits.
 \end{prob}
 
-\input{chapters/references08}
+\input{chapters/references07}

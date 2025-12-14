@@ -37,6 +37,15 @@
 **Target Personas:** Curious Developer, Tinkerer
 **Goal:** Build foundation with consumer hardware, serving 7B models
 
+**Chapter Structure (Updated):**
+1. Introduction to Self-Hosted Inference
+2. **How LLMs Work (NEW)** - Model fundamentals before hardware
+3. Hardware Fundamentals (was Chapter 2)
+4. Model Selection and Formats (was Chapter 3)
+5. Inference Engines (was Chapter 4)
+6. Building Control Plane v0.1 (was Chapter 5)
+6.5. Browser AI & Hybrid Architecture (was Chapter 5.5)
+
 ---
 
 ### Chapter 1: Introduction to Self-Hosted Inference
@@ -116,10 +125,111 @@
 
 ---
 
-### Chapter 2: Hardware Fundamentals
+### Chapter 2: How LLMs Work (NEW)
 
-**Status:** 🟡 Outline Created
-**File:** `src/chapters/chapter02.tex`
+**Status:** ⬜ Not Started
+**File:** `src/chapters/chapter02.tex` (to be created)
+
+**Learning Objectives:**
+- Understand transformer architecture at a systems level (not math)
+- Trace the inference lifecycle from prompt to response
+- Understand why KV cache exists and how it affects memory
+- Know the key metrics that matter for inference performance
+- Brief overview of other architectures (diffusion, MoE)
+
+**Topics:**
+- Neural networks to transformers (brief history)
+- Inside a transformer: attention, layers, parameters
+- The inference lifecycle: tokenize → prefill → decode → response
+- Why KV cache exists (the optimization that makes generation practical)
+- Key metrics: latency, throughput, TTFT, ITL, tokens/sec
+- Other architectures: diffusion models, Mixture of Experts, multimodal
+
+**Why This Chapter Exists:**
+Chapter 3 (Hardware) discusses VRAM, KV cache, and attention heads. This chapter provides the conceptual foundation so readers understand *why* these components exist before calculating their memory requirements.
+
+**Persona Callouts:**
+- Backend Engineer: Understanding the request lifecycle
+- Infrastructure Engineer: Why certain optimizations matter
+- Curious Developer: How transformers actually work
+
+**Non-Goals:**
+- No matrix multiplication math
+- No gradient descent explanations
+- No training details (covered in Chapter 1)
+- This is "systems understanding" not "ML theory"
+
+**Hands-On:**
+- Visualize token generation step by step
+- Observe KV cache growth during generation
+- Measure TTFT vs ITL in practice
+
+**Deliverable:** Mental model for how inference works, foundation for hardware chapter
+
+#### Task Breakdown
+
+**2.1 Section: From Neural Networks to Transformers**
+- [ ] Write brief neural network history (1-2 paragraphs)
+- [ ] Write RNNs and the sequential bottleneck
+- [ ] Write "Attention Is All You Need" breakthrough
+- [ ] Write why transformers dominate for language (parallelization)
+- [ ] Create timeline diagram of key milestones
+
+**2.2 Section: Inside a Transformer**
+- [ ] Write high-level architecture overview (encoder-decoder vs decoder-only)
+- [ ] Write Attention Mechanism subsection (what it does, not the math)
+- [ ] Write Multi-Head Attention subsection (why multiple heads)
+- [ ] Write Feed-Forward Networks subsection
+- [ ] Write Layer Normalization subsection (brief)
+- [ ] Write Parameters: What Are the "Billions"? subsection
+- [ ] Create diagram: Transformer layer structure
+
+**2.3 Section: The Inference Lifecycle**
+- [ ] Write Tokenization subsection (text → tokens → IDs)
+- [ ] Write Prefill Phase subsection (processing the prompt)
+- [ ] Write Decode Phase subsection (autoregressive generation)
+- [ ] Write The Generation Loop subsection (how tokens are produced one by one)
+- [ ] Write Stopping Conditions subsection (EOS, max tokens, stop sequences)
+- [ ] Create diagram: Request lifecycle flow
+
+**2.4 Section: Why KV Cache Exists**
+- [ ] Write The Naive Approach subsection (recompute attention every token)
+- [ ] Write The Optimization subsection (cache key-value pairs)
+- [ ] Write Memory Growth subsection (why context length matters)
+- [ ] Write The Trade-off subsection (memory vs compute)
+- [ ] Create diagram: KV cache growth visualization
+
+**2.5 Section: Key Metrics for Inference**
+- [ ] Write Time to First Token (TTFT) subsection
+- [ ] Write Inter-Token Latency (ITL) subsection
+- [ ] Write Tokens per Second subsection (generation speed)
+- [ ] Write Throughput subsection (requests/second)
+- [ ] Write What Affects Each Metric subsection
+- [ ] Create table: Metrics summary with typical values
+
+**2.6 Section: Other Model Architectures**
+- [ ] Write Mixture of Experts (MoE) subsection (what, why, implications)
+- [ ] Write Diffusion Models subsection (brief - image generation)
+- [ ] Write Multimodal Models subsection (vision + language)
+- [ ] Write State Space Models subsection (Mamba, brief mention)
+
+**2.7 Section: Summary**
+- [ ] Write chapter summary connecting to hardware chapter
+- [ ] Key Takeaways box
+- [ ] Preview Chapter 3 (Hardware Fundamentals)
+
+**2.8 Section: Problems**
+- [ ] Create 2-3 conceptual problems
+
+**2.9 References**
+- [ ] Create references02.tex with key papers and resources
+
+---
+
+### Chapter 3: Hardware Fundamentals (was Chapter 2)
+
+**Status:** 🟢 First Draft Complete
+**File:** `src/chapters/chapter03.tex` (rename from chapter02.tex)
 
 **Learning Objectives:**
 - Understand VRAM, RAM, CPU vs GPU tradeoffs
@@ -155,56 +265,56 @@
 
 #### Task Breakdown
 
-**2.1 Section: How Transformers Use Memory**
-- [ ] Write Model Weights subsection (formula, worked examples)
-- [ ] Write KV Cache subsection (what it stores, why it grows)
-- [ ] Write Activation/Working Memory subsection
+**3.1 Section: How Transformers Use Memory**
+- [x] Write Model Weights subsection (formula, worked examples)
+- [x] Write KV Cache subsection (what it stores, why it grows)
+- [x] Write Activation/Working Memory subsection
 - [ ] Create diagram: Memory layout during inference
 
-**2.2 Section: VRAM Calculation**
-- [ ] Write Precision and Memory subsection (FP32, FP16, BF16, INT8, INT4 table)
-- [ ] Write Worked Examples subsection (7B, 30B, 70B, 400B)
+**3.2 Section: VRAM Calculation**
+- [x] Write Precision and Memory subsection (FP32, FP16, BF16, INT8, INT4 table)
+- [x] Write Worked Examples subsection (7B, 30B, 70B, 400B)
 - [ ] Create VRAM calculator spreadsheet (deliverable)
 
-**2.3 Section: CPU vs GPU Inference**
-- [ ] Write CPU Inference subsection
-- [ ] Write GPU Inference subsection
-- [ ] Write Hybrid Approaches subsection (layer offloading)
+**3.3 Section: CPU vs GPU Inference**
+- [x] Write CPU Inference subsection
+- [x] Write GPU Inference subsection
+- [x] Write Hybrid Approaches subsection (layer offloading)
 
-**2.4 Section: GPU Hardware Comparison**
-- [ ] Write NVIDIA Consumer GPUs subsection (RTX 30xx, 40xx)
-- [ ] Write NVIDIA Professional GPUs subsection (A100, H100)
-- [ ] Write AMD GPUs subsection (ROCm status, MI series)
-- [ ] Write Apple Silicon subsection (M1/M2/M3/M4)
-- [ ] Create Hardware Recommendation Matrix table
+**3.4 Section: GPU Hardware Comparison**
+- [x] Write NVIDIA Consumer GPUs subsection (RTX 30xx, 40xx)
+- [x] Write NVIDIA Professional GPUs subsection (A100, H100)
+- [x] Write AMD GPUs subsection (ROCm status, MI series)
+- [x] Write Apple Silicon subsection (M1/M2/M3/M4)
+- [x] Create Hardware Recommendation Matrix table
 
-**2.5 Section: Owned vs Rented Infrastructure**
-- [ ] Write Buying Hardware subsection (CapEx, ongoing costs)
-- [ ] Write Renting Cloud GPUs subsection (RunPod, Vast.ai, Lambda Labs, pricing table)
-- [ ] Write Break-Even Analysis subsection (formula, worked examples)
-- [ ] Write Hybrid Strategies subsection
+**3.5 Section: Owned vs Rented Infrastructure**
+- [x] Write Buying Hardware subsection (CapEx, ongoing costs)
+- [x] Write Renting Cloud GPUs subsection (RunPod, Vast.ai, Lambda Labs, pricing table)
+- [x] Write Break-Even Analysis subsection (formula, worked examples)
+- [x] Write Hybrid Strategies subsection
 - [ ] Create cost comparison spreadsheet (deliverable)
 
-**2.6 Section: Power and Cooling**
-- [ ] Write power consumption by GPU table
-- [ ] Cooling requirements overview
-- [ ] Home lab considerations
+**3.6 Section: Power and Cooling**
+- [x] Write power consumption by GPU table
+- [x] Cooling requirements overview
+- [x] Home lab considerations
 - [ ] Data center placement basics
 
-**2.7 Section: Summary**
-- [ ] Write chapter summary
-- [ ] Review Key Takeaways box
-- [ ] Preview next chapter
+**3.7 Section: Summary**
+- [x] Write chapter summary
+- [x] Review Key Takeaways box
+- [x] Preview next chapter
 
-**2.8 References**
-- [ ] Add references to references02.tex
+**3.8 References**
+- [x] Add references to references03.tex (rename from references02.tex)
 
 ---
 
-### Chapter 3: Model Selection and Formats
+### Chapter 4: Model Selection and Formats (was Chapter 3)
 
 **Status:** 🟡 Outline Created
-**File:** `src/chapters/chapter03.tex`
+**File:** `src/chapters/chapter04.tex` (rename from chapter03.tex)
 
 **Learning Objectives:**
 - Navigate HuggingFace and model repositories
@@ -240,60 +350,60 @@
 
 #### Task Breakdown
 
-**3.0 Section: Model Architectures Overview**
+**4.0 Section: Model Architectures Overview**
 - [ ] Write decoder-only vs encoder-decoder explanation
 - [ ] Explain why decoder-only dominates for LLMs
 - [ ] Brief mention of encoder models (BERT-style) for embeddings
 
-**3.1 Section: Understanding Model Formats**
+**4.1 Section: Understanding Model Formats**
 - [ ] Write SafeTensors subsection
 - [ ] Write GGUF subsection (GGML history, single-file advantage)
 - [ ] Write ONNX subsection
 - [ ] Write EXL2 subsection (ExLlama format)
 - [ ] Create Format Comparison table
 
-**3.2 Section: Quantization Fundamentals**
+**4.2 Section: Quantization Fundamentals**
 - [ ] Write What is Quantization subsection
 - [ ] Write Quantization Levels subsection (Q8, Q6, Q5, Q4, Q3/Q2)
 - [ ] Create quantization comparison chart (quality vs memory)
 
-**3.3 Section: Quantization Methods**
+**4.3 Section: Quantization Methods**
 - [ ] Write GGUF Quantization subsection (Q4_K_M explained)
 - [ ] Write GPTQ subsection
 - [ ] Write AWQ subsection
 - [ ] Write BitsAndBytes subsection
 - [ ] Create Method Comparison table
 
-**3.4 Section: Choosing Models**
+**4.4 Section: Choosing Models**
 - [ ] Write Model Families Overview (Llama, Mistral, Qwen, Phi, Gemma)
 - [ ] Write Size vs Quality Trade-offs
 - [ ] Write Model Naming Conventions guide (what 7B-Q4_K_M means)
 - [ ] Write Licensing Considerations (Apache 2.0, Llama license, commercial use)
 - [ ] Create Decision Matrix table
 
-**3.5 Section: Where to Find Models**
+**4.5 Section: Where to Find Models**
 - [ ] Write Hugging Face Hub guide
 - [ ] Write Ollama Library guide
 - [ ] Write Model Evaluation guide
 
-**3.6 Section: Building a Model Registry**
+**4.6 Section: Building a Model Registry**
 - [ ] Write Why a Registry subsection
 - [ ] Write Registry Data Model (add prose to existing code)
 
-**3.7 Section: Summary**
+**4.7 Section: Summary**
 - [ ] Write chapter summary
 - [ ] Review Key Takeaways
 - [ ] Preview next chapter
 
-**3.8 References**
-- [ ] Add references to references03.tex
+**4.8 References**
+- [ ] Add references to references04.tex (rename from references03.tex)
 
 ---
 
-### Chapter 4: Inference Engines
+### Chapter 5: Inference Engines (was Chapter 4)
 
 **Status:** 🟡 Outline Created
-**File:** `src/chapters/chapter04.tex`
+**File:** `src/chapters/chapter05.tex` (rename from chapter04.tex)
 
 **Learning Objectives:**
 - Understand different inference engines
@@ -330,23 +440,23 @@
 
 #### Task Breakdown
 
-**4.1 Section: The Role of Inference Engines**
+**5.1 Section: The Role of Inference Engines**
 - [ ] Write overview (load models, process requests, batching, streaming)
 
-**4.2 Section: Ollama**
+**5.2 Section: Ollama**
 - [ ] Write Architecture subsection (llama.cpp based, modelfile)
 - [ ] Write Installation and Configuration
 - [ ] Write API Reference (expand existing code)
 - [ ] Write When to Use Ollama
 
-**4.3 Section: llama.cpp**
+**5.3 Section: llama.cpp**
 - [ ] Write Architecture subsection (C/C++, multi-backend)
 - [ ] Write Building and Installation (CPU, CUDA, Metal)
 - [ ] Write Server Mode (add prose to existing code)
 - [ ] Write Advanced Configuration (layer offload, threads)
 - [ ] Write When to Use llama.cpp
 
-**4.4 Section: vLLM**
+**5.4 Section: vLLM**
 - [ ] Write Paged Attention subsection
 - [ ] Write Continuous Batching subsection
 - [ ] Write Installation and Setup (add prose to existing code)
@@ -354,33 +464,33 @@
 - [ ] Write Performance Tuning
 - [ ] Write When to Use vLLM
 
-**4.5 Section: Other Engines**
+**5.5 Section: Other Engines**
 - [ ] Write TensorRT-LLM brief overview
 - [ ] Write TGI brief overview
 - [ ] Write SGLang brief overview
 
-**4.6 Section: Engine Comparison**
+**5.6 Section: Engine Comparison**
 - [ ] Create comprehensive Comparison Matrix table
 - [ ] Write Decision Framework guide
 
-**4.7 Section: Hands-On**
+**5.7 Section: Hands-On**
 - [ ] Write exercise: Run all three engines
 - [ ] Create benchmark comparison script
 
-**4.8 Section: Summary**
+**5.8 Section: Summary**
 - [ ] Write chapter summary
 - [ ] Review Key Takeaways
 - [ ] Preview next chapter
 
-**4.9 References**
-- [ ] Add references to references04.tex
+**5.9 References**
+- [ ] Add references to references05.tex (rename from references04.tex)
 
 ---
 
-### Chapter 5: Building Control Plane v0.1
+### Chapter 6: Building Control Plane v0.1 (was Chapter 5)
 
 **Status:** 🟡 Outline Created
-**File:** `src/chapters/chapter05.tex`
+**File:** `src/chapters/chapter06.tex` (rename from chapter05.tex)
 
 **Learning Objectives:**
 - Design a simple API gateway for inference
@@ -416,69 +526,69 @@
 
 #### Task Breakdown
 
-**5.1 Section: Control Plane Architecture**
+**6.1 Section: Control Plane Architecture**
 - [ ] Write What is a Control Plane subsection
 - [ ] Write v0.1 Capabilities subsection
 - [ ] Create System Architecture Diagram
 
-**5.2 Section: Project Setup**
+**6.2 Section: Project Setup**
 - [ ] Write Go Module Initialization (add context to existing code)
 - [ ] Write Dependencies explanation (chi, prometheus, slog)
 
-**5.3 Section: Core Interfaces**
+**6.3 Section: Core Interfaces**
 - [ ] Write Backend Interface explanation (add prose to existing code)
 - [ ] Write Health Interface explanation (add prose to existing code)
 - [ ] Explain design decisions
 
-**5.4 Section: Implementing Ollama Backend**
+**6.4 Section: Implementing Ollama Backend**
 - [ ] Add prose explaining the implementation (code exists)
 - [ ] Explain error handling approach
 - [ ] Explain response conversion
 - [ ] Explain context propagation patterns
 - [ ] Explain graceful shutdown implementation
 
-**5.5 Section: API Server**
+**6.5 Section: API Server**
 - [ ] Write Router Setup (endpoints explanation)
 - [ ] Write Request Handling middleware explanation
 - [ ] Write request tracing setup (trace IDs, correlation)
 
-**5.6 Section: Metrics with Prometheus**
+**6.6 Section: Metrics with Prometheus**
 - [ ] Write Key Metrics to Track
 - [ ] Add prose explaining metrics code (exists)
 
-**5.7 Section: Docker Deployment**
+**6.7 Section: Docker Deployment**
 - [ ] Write Dockerfile explanation (multi-stage build)
 - [ ] Write Docker Compose Stack prose (code exists)
 
-**5.8 Section: Grafana Dashboard**
+**6.8 Section: Grafana Dashboard**
 - [ ] Write dashboard creation guide
 - [ ] Create Grafana dashboard JSON (deliverable)
 
-**5.9 Section: Testing the Control Plane**
+**6.9 Section: Testing the Control Plane**
 - [ ] Write integration testing guide
 - [ ] Write k6 load testing setup and script
 - [ ] Document expected performance baselines
-- [ ] Add queue depth hints (foundation for Chapter 12 priority scheduling)
+- [ ] Add queue depth hints (foundation for Chapter 13 priority scheduling)
 
-**5.10 Section: Configuration Management**
+**6.10 Section: Configuration Management**
 - [ ] Add prose explaining config code (exists)
 
-**5.11 Section: Summary**
+**6.11 Section: Summary**
 - [ ] Write chapter summary
 - [ ] Review Key Takeaways
 - [ ] Preview Part II
 
-**5.12 References**
-- [ ] Add references to references05.tex
+**6.12 References**
+- [ ] Add references to references06.tex (rename from references05.tex)
 
-**End of Part I (without Chapter 5.5):** Working inference service with observability, serving a 7B model
+**End of Part I (without Chapter 6.5):** Working inference service with observability, serving a 7B model
 
 ---
 
-### Chapter 5.5: Browser AI & Hybrid Architecture (Optional)
+### Chapter 6.5: Browser AI & Hybrid Architecture (was Chapter 5.5, Optional)
 
 **Status:** 🟡 Outline Created
-**File:** `src/chapters/chapter05_5.tex`
+**File:** `src/chapters/chapter06_5.tex` (rename from chapter05_5.tex)
 
 > **Note:** This chapter is optional. It can be skipped if focusing on server-side inference only.
 
@@ -521,74 +631,74 @@
 
 #### Task Breakdown
 
-**5.5.1 Why Browser Inference**
+**6.5.1 Why Browser Inference**
 - [ ] Write zero-cost deployment explanation
 - [ ] Write ultra-low latency benefits
 - [ ] Write privacy advantages
 - [ ] Write trade-offs vs server
 
-**5.5.2 Browser Technologies**
+**6.5.2 Browser Technologies**
 - [ ] Write WebGPU section
 - [ ] Write WebGL 2.0 fallback
 - [ ] Write WebAssembly for CPU
 - [ ] Write WebNN (future)
 
-**5.5.3 Frameworks**
+**6.5.3 Frameworks**
 - [ ] Write Transformers.js overview
 - [ ] Write WebLLM (recommended) guide
 - [ ] Write ONNX Runtime Web
 - [ ] Create framework comparison
 
-**5.5.4 Model Selection for Browser**
+**6.5.4 Model Selection for Browser**
 - [ ] Write size constraints by device
 - [ ] Write recommended models
 - [ ] Write format requirements
 
-**5.5.5 Capability Detection**
+**6.5.5 Capability Detection**
 - [ ] Write detection code and explanation
 - [ ] Write GPU tier classification
 - [ ] Write browser compatibility
 
-**5.5.6 Hybrid Client Architecture**
+**6.5.6 Hybrid Client Architecture**
 - [ ] Write HybridInferenceClient design
 - [ ] Write routing decisions
 - [ ] Write fallback mechanisms
 
-**5.5.7 Control Plane Integration**
+**6.5.7 Control Plane Integration**
 - [ ] Write HybridRouter interface
 - [ ] Write BrowserModelRegistry
 - [ ] Write API endpoints
 - [ ] Write browser-specific analytics tracking
 - [ ] Write cost tracking for browser vs server requests
 
-**5.5.8 Performance & Economics**
+**6.5.8 Performance & Economics**
 - [ ] Write performance expectations by device
 - [ ] Write cost analysis (80% browser = 78% cost reduction)
 - [ ] Write break-even analysis
 - [ ] Create cost comparison methodology
 
-**5.5.9 Best Practices**
+**6.5.9 Best Practices**
 - [ ] Write progressive enhancement patterns
 - [ ] Write battery awareness guidelines
 - [ ] Write browser caching strategies (model weights, KV cache)
 - [ ] Write user control principles (let users choose browser vs server)
 - [ ] Write error handling and fallback patterns
 
-**5.5.10 Limitations**
+**6.5.10 Limitations**
 - [ ] Document model size constraints
 - [ ] Document performance variability across devices
 - [ ] Document battery drain considerations
 - [ ] Document browser compatibility matrix
 - [ ] Document security considerations
 
-**5.5.11 Summary**
+**6.5.11 Summary**
 - [ ] Write chapter summary
 - [ ] Recap when to use browser inference
 
-**5.5.12 References**
-- [ ] Add references to references05_5.tex
+**6.5.12 References**
+- [ ] Add references to references06_5.tex (rename from references05_5.tex)
 
-**End of Part I (with Chapter 5.5):** Complete inference system supporting both server and browser deployment
+**End of Part I (with Chapter 6.5):** Complete inference system supporting both server and browser deployment
 
 ---
 
@@ -601,11 +711,11 @@
 
 | Chapter | Title | Status | Priority | Notes |
 |---------|-------|--------|----------|-------|
-| 6 | Authentication and API Keys | 🟡 | HIGH | JWT, API key management |
-| 7 | Rate Limiting and Quotas | 🟡 | HIGH | Token bucket, per-tier limits |
-| 8 | Response Caching | 🟡 | MEDIUM | Exact + semantic caching |
-| 9 | Request Queue and Priority | 🟡 | MEDIUM | Priority queue, load shedding |
-| 10 | 30B Model Optimization | 🟡 | HIGH | KV cache, vLLM tuning |
+| 7 | Authentication and API Keys (was 6) | 🟡 | HIGH | JWT, API key management |
+| 8 | Rate Limiting and Quotas (was 7) | 🟡 | HIGH | Token bucket, per-tier limits |
+| 9 | Response Caching (was 8) | 🟡 | MEDIUM | Exact + semantic caching |
+| 10 | Request Queue and Priority (was 9) | 🟡 | MEDIUM | Priority queue, load shedding |
+| 11 | 30B Model Optimization (was 10) | 🟡 | HIGH | KV cache, vLLM tuning |
 
 ### Part II TODO Items
 - [ ] Design complete auth flow diagrams
@@ -625,11 +735,11 @@
 
 | Chapter | Title | Status | Priority | Notes |
 |---------|-------|--------|----------|-------|
-| 11 | Multi-Tenant Architecture | 🟡 | HIGH | Isolation models, tenant data |
-| 12 | Usage Tracking and Billing | 🟡 | MEDIUM | Metering, Stripe integration |
-| 13 | Multi-GPU and Distributed Inference | 🟡 | HIGH | Tensor/pipeline parallelism |
-| 14 | Model Routing and Selection | 🟡 | MEDIUM | Cost-aware routing, A/B testing |
-| 15 | 70B Deployment | 🟡 | HIGH | Complete deployment guide |
+| 12 | Multi-Tenant Architecture (was 11) | 🟡 | HIGH | Isolation models, tenant data |
+| 13 | Usage Tracking and Billing (was 12) | 🟡 | MEDIUM | Metering, Stripe integration |
+| 14 | Multi-GPU and Distributed Inference (was 13) | 🟡 | HIGH | Tensor/pipeline parallelism |
+| 15 | Model Routing and Selection (was 14) | 🟡 | MEDIUM | Cost-aware routing, A/B testing |
+| 16 | 70B Deployment (was 15) | 🟡 | HIGH | Complete deployment guide |
 
 ### Part III TODO Items
 - [ ] Design tenant isolation architecture
@@ -649,9 +759,9 @@
 
 | Chapter | Title | Status | Priority | Notes |
 |---------|-------|--------|----------|-------|
-| 16 | 400B Deployment and H100 Optimization | 🟡 | HIGH | H100 deep dive, economics |
-| 17 | Building CodeLab | 🟡 | HIGH | Capstone: AI coding assistant |
-| 18 | Production Operations | 🟡 | HIGH | Final chapter, v1.0 complete |
+| 17 | 400B Deployment and H100 Optimization (was 16) | 🟡 | HIGH | H100 deep dive, economics |
+| 18 | Building CodeLab (was 17) | 🟡 | HIGH | Capstone: AI coding assistant |
+| 19 | Production Operations (was 18) | 🟡 | HIGH | Final chapter, v1.0 complete |
 
 ### Part IV TODO Items
 - [ ] Research H100 vs A100 benchmarks
@@ -787,11 +897,12 @@ The patterns, code, and architecture apply equally to all deployment models.
 ## Writing Order (Recommended)
 
 1. **Chapter 1** - Sets the stage, motivates the reader
-2. **Chapter 2** - Hardware decisions needed before model selection
-3. **Chapter 3** - Model understanding before engine selection
-4. **Chapter 4** - Engine understanding before building control plane
-5. **Chapter 5** - Capstone of Part I, brings it all together
-6. **Chapter 5.5** - Optional, can be deferred or skipped
+2. **Chapter 2 (NEW)** - How LLMs Work - conceptual foundation for hardware chapter
+3. **Chapter 3** - Hardware decisions (was Chapter 2)
+4. **Chapter 4** - Model understanding before engine selection (was Chapter 3)
+5. **Chapter 5** - Engine understanding before building control plane (was Chapter 4)
+6. **Chapter 6** - Capstone of Part I, brings it all together (was Chapter 5)
+7. **Chapter 6.5** - Optional, can be deferred or skipped (was Chapter 5.5)
 
 ---
 

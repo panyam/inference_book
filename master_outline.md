@@ -40,40 +40,41 @@ This is your **single source of truth** for writing the book. It combines:
 
 ## Table of Contents
 
-### Part I: Foundations (Chapters 1-5.5)
+### Part I: Foundations (Chapters 1-6.5)
 **Model Size:** 7B parameters | **Hardware:** Consumer-grade | **Control Plane:** v0.1
 
 1. Introduction to Self-Hosted Inference
-2. Hardware Fundamentals
-3. Model Selection and Formats
-4. Inference Engines
-5. Building Control Plane v0.1
-5.5. Edge Inference - Browser AI & Hybrid Architecture *(optional)*
+2. **How LLMs Work (NEW)** - Model fundamentals before hardware
+3. Hardware Fundamentals (was Chapter 2)
+4. Model Selection and Formats (was Chapter 3)
+5. Inference Engines (was Chapter 4)
+6. Building Control Plane v0.1 (was Chapter 5)
+6.5. Edge Inference - Browser AI & Hybrid Architecture *(optional, was 5.5)*
 
-### Part II: Production Deployment (Chapters 6-10)
+### Part II: Production Deployment (Chapters 7-11)
 **Model Size:** 30B parameters | **Hardware:** Serious consumer/entry datacenter | **Control Plane:** v0.2
 
-6. Authentication and Authorization
-7. Rate Limiting and Quotas
-8. Caching and Performance
-9. Request Queuing and Load Balancing
-10. Advanced Optimization
+7. Authentication and Authorization (was Chapter 6)
+8. Rate Limiting and Quotas (was Chapter 7)
+9. Caching and Performance (was Chapter 8)
+10. Request Queuing and Load Balancing (was Chapter 9)
+11. Advanced Optimization (was Chapter 10)
 
-### Part III: Multi-Tenant Platform (Chapters 11-15)
+### Part III: Multi-Tenant Platform (Chapters 12-16)
 **Model Size:** 70B parameters | **Hardware:** Multi-GPU setups | **Control Plane:** v0.3
 
-11. Multi-Tenancy Architecture
-12. Priority Scheduling
-13. Resource Management
-14. Cost Tracking and Analytics
-15. Distributed Inference (Multi-GPU)
+12. Multi-Tenancy Architecture (was Chapter 11)
+13. Priority Scheduling (was Chapter 12)
+14. Resource Management (was Chapter 13)
+15. Cost Tracking and Analytics (was Chapter 14)
+16. Distributed Inference (Multi-GPU) (was Chapter 15)
 
-### Part IV: Inference Lab (Chapters 16-18)
+### Part IV: Inference Lab (Chapters 17-19)
 **Model Size:** 400B parameters | **Hardware:** 8x H100/A100 | **Control Plane:** v1.0
 
-16. The Inference Lab - Planning and Economics
-17. Building the Complete Platform
-18. Operations and Scaling
+17. The Inference Lab - Planning and Economics (was Chapter 16)
+18. Building the Complete Platform (was Chapter 17)
+19. Operations and Scaling (was Chapter 18)
 
 ### Appendices
 A. Hardware Reference
@@ -191,7 +192,7 @@ Optimization Strategy → Application Architecture
 
 **Progressive Feature Matrix:**
 
-| Feature | 7B<br>(Ch 1-5) | 30B<br>(Ch 6-10) | 70B<br>(Ch 11-15) | 400B<br>(Ch 16-18) |
+| Feature | 7B<br>(Ch 1-6) | 30B<br>(Ch 7-11) | 70B<br>(Ch 12-16) | 400B<br>(Ch 17-19) |
 |---------|----------------|------------------|-------------------|-------------------|
 | Basic API | ✓ | ✓ | ✓ | ✓ |
 | Metrics | ✓ | ✓ | ✓ | ✓ |
@@ -210,7 +211,7 @@ Optimization Strategy → Application Architecture
 | Distributed | - | - | - | ✓ |
 | Auto-Scaling | - | - | - | ✓ |
 
-*Browser support added in Chapter 5.5 (optional)
+*Browser support added in Chapter 6.5 (optional)
 
 **Code Organization:**
 ```
@@ -378,9 +379,9 @@ Time: 30 minutes
 
 ---
 
-### Phase 2: Part I - Foundations (Chapters 1-5.5)
+### Phase 2: Part I - Foundations (Chapters 1-6.5)
 
-**Target: 8-10 weeks**
+**Target: 10-12 weeks**
 
 #### Chapter 1: Introduction (Week 1)
 **Reference:** `chapter_breakdown.md` → Part I → Chapter 1
@@ -413,7 +414,50 @@ Time: 30 minutes
 
 ---
 
-#### Chapter 2: Hardware Fundamentals (Week 2)
+#### Chapter 2: How LLMs Work (Week 2) - NEW
+**Reference:** `TODO.md` → Chapter 2
+
+**Purpose:** Provide conceptual foundation for hardware chapter. Readers will understand *why* KV cache exists before calculating its memory requirements.
+
+**Writing Steps:**
+1. From Neural Networks to Transformers
+   - Brief history (not math-heavy)
+   - Why transformers won (parallelization)
+
+2. Inside a Transformer
+   - Attention mechanism (what it does)
+   - Layers and parameters
+   - What are the "billions"?
+
+3. The Inference Lifecycle
+   - Tokenization
+   - Prefill phase
+   - Decode phase (autoregressive)
+   - Stopping conditions
+
+4. Why KV Cache Exists
+   - The naive approach (recompute every token)
+   - The optimization (cache K/V)
+   - Memory growth implications
+
+5. Key Metrics
+   - TTFT, ITL, tokens/sec, throughput
+   - What affects each metric
+
+6. Other Architectures (brief)
+   - MoE, diffusion, multimodal
+
+**Deliverables:**
+- [ ] Chapter draft with diagrams
+- [ ] Transformer layer diagram
+- [ ] Inference lifecycle diagram
+- [ ] KV cache visualization
+
+**Dependencies:** Chapter 1 complete
+
+---
+
+#### Chapter 3: Hardware Fundamentals (Week 3) - was Chapter 2
 **Reference:** `chapter_breakdown.md` → Part I → Chapter 2
 
 **Writing Steps:**
@@ -445,11 +489,11 @@ Time: 30 minutes
 - [ ] Cost comparison spreadsheet
 - [ ] Procurement guide
 
-**Dependencies:** Chapter 1 complete
+**Dependencies:** Chapter 2 complete (now understand KV cache conceptually)
 
 ---
 
-#### Chapter 3: Model Selection (Week 3)
+#### Chapter 4: Model Selection (Week 4) - was Chapter 3
 **Reference:** `chapter_breakdown.md` → Part I → Chapter 3
 
 **Writing Steps:**
@@ -480,11 +524,11 @@ Time: 30 minutes
 - [ ] Model quality benchmarks (MMLU, HumanEval)
 - [ ] Curated model list
 
-**Dependencies:** Chapter 2 complete (know hardware constraints)
+**Dependencies:** Chapter 3 complete (know hardware constraints)
 
 ---
 
-#### Chapter 4: Inference Engines (Week 4)
+#### Chapter 5: Inference Engines (Week 5) - was Chapter 4
 **Reference:** `chapter_breakdown.md` → Part I → Chapter 4
 
 **Writing Steps:**
@@ -517,12 +561,12 @@ Time: 30 minutes
 - [ ] Comparison results table
 - [ ] Recommendation matrix (use case → engine)
 
-**Dependencies:** Chapter 3 complete (have models ready)
+**Dependencies:** Chapter 4 complete (have models ready)
 
 ---
 
-#### Chapter 5: Control Plane v0.1 (Weeks 5-6)
-**Reference:** 
+#### Chapter 6: Control Plane v0.1 (Weeks 6-7) - was Chapter 5
+**Reference:**
 - `chapter_breakdown.md` → Part I → Chapter 5
 - `control_plane_interfaces.md` → Phase 1
 
@@ -565,26 +609,26 @@ Time: 30 minutes
 - [ ] Grafana dashboard
 - [ ] Load test results
 
-**Dependencies:** Chapters 1-4 complete
+**Dependencies:** Chapters 1-5 complete
 
 ---
 
-#### Chapter 5.5: Browser AI & Hybrid (Week 7)
+#### Chapter 6.5: Browser AI & Hybrid (Week 8) - was Chapter 5.5
 **Reference:** `browser_ai_chapter.md` (entire document)
 
 **Writing Steps:**
 1. Follow the chapter structure exactly
-   - 5.5.1: Why Browser Inference?
-   - 5.5.2: Technologies (WebGPU, WebGL, WASM)
-   - 5.5.3: Model Selection for Browser
-   - 5.5.4: Capability Detection
-   - 5.5.5: Hybrid Client Implementation
-   - 5.5.6: Control Plane Integration
-   - 5.5.7: Performance & Economics
-   - 5.5.8: Hands-On Exercise
-   - 5.5.9: Best Practices
-   - 5.5.10: Limitations
-   - 5.5.11: Summary
+   - 6.5.1: Why Browser Inference?
+   - 6.5.2: Technologies (WebGPU, WebGL, WASM)
+   - 6.5.3: Model Selection for Browser
+   - 6.5.4: Capability Detection
+   - 6.5.5: Hybrid Client Implementation
+   - 6.5.6: Control Plane Integration
+   - 6.5.7: Performance & Economics
+   - 6.5.8: Hands-On Exercise
+   - 6.5.9: Best Practices
+   - 6.5.10: Limitations
+   - 6.5.11: Summary
 
 **Deliverables:**
 - [ ] Browser inference client (TypeScript)
@@ -593,17 +637,17 @@ Time: 30 minutes
 - [ ] Demo web application
 - [ ] Cost comparison analysis
 
-**Dependencies:** Chapter 5 complete (need control plane v0.1)
+**Dependencies:** Chapter 6 complete (need control plane v0.1)
 
 **Note:** This chapter can be made optional or moved to an appendix if you want to keep main narrative focused on server-side.
 
 ---
 
-### Phase 3: Part II - Production (Chapters 6-10)
+### Phase 3: Part II - Production (Chapters 7-11)
 
 **Target: 8-10 weeks**
 
-#### Chapter 6: Authentication (Week 8)
+#### Chapter 7: Authentication (Week 9) - was Chapter 6
 **Reference:**
 - `chapter_breakdown.md` → Part II → Chapter 6
 - `control_plane_interfaces.md` → Phase 2 (UserManager, etc.)
@@ -635,11 +679,11 @@ Time: 30 minutes
 - [ ] Security documentation
 - [ ] Test suite
 
-**Dependencies:** Chapter 5 or 5.5 complete
+**Dependencies:** Chapter 6 or 6.5 complete
 
 ---
 
-#### Chapter 7: Rate Limiting (Week 9)
+#### Chapter 8: Rate Limiting (Week 10) - was Chapter 7
 **Reference:**
 - `chapter_breakdown.md` → Part II → Chapter 7
 - `control_plane_interfaces.md` → Phase 2 (RateLimiter)
@@ -669,11 +713,11 @@ Time: 30 minutes
 - [ ] Quota management system
 - [ ] Load tests showing rate limiting
 
-**Dependencies:** Chapter 6 complete (need users)
+**Dependencies:** Chapter 7 complete (need users)
 
 ---
 
-#### Chapter 8: Caching (Week 10)
+#### Chapter 9: Caching (Week 11) - was Chapter 8
 **Reference:**
 - `chapter_breakdown.md` → Part II → Chapter 8
 - `control_plane_interfaces.md` → Phase 2 (CacheManager)
@@ -702,11 +746,11 @@ Time: 30 minutes
 - [ ] Performance comparison (with/without cache)
 - [ ] Best practices guide
 
-**Dependencies:** Chapter 6 complete
+**Dependencies:** Chapter 7 complete
 
 ---
 
-#### Chapter 9: Queuing & Load Balancing (Week 11-12)
+#### Chapter 10: Queuing & Load Balancing (Week 12-13) - was Chapter 9
 **Reference:**
 - `chapter_breakdown.md` → Part II → Chapter 9
 - `control_plane_interfaces.md` → Phase 2 (QueueManager, BackendPool)
@@ -736,11 +780,11 @@ Time: 30 minutes
 - [ ] Failure recovery tests
 - [ ] Performance under load
 
-**Dependencies:** Chapters 6-8 complete
+**Dependencies:** Chapters 7-9 complete
 
 ---
 
-#### Chapter 10: Optimization (Week 13-14)
+#### Chapter 11: Optimization (Week 14-15) - was Chapter 10
 **Reference:** `chapter_breakdown.md` → Part II → Chapter 10
 
 **Writing Steps:**
@@ -778,11 +822,11 @@ Time: 30 minutes
 
 ---
 
-### Phase 4: Part III - Multi-Tenant (Chapters 11-15)
+### Phase 4: Part III - Multi-Tenant (Chapters 12-16)
 
 **Target: 8-10 weeks**
 
-#### Chapter 11: Multi-Tenancy (Week 15-16)
+#### Chapter 12: Multi-Tenancy (Week 16-17) - was Chapter 11
 **Reference:**
 - `chapter_breakdown.md` → Part III → Chapter 11
 - `control_plane_interfaces.md` → Phase 3 (TenantManager, Tier)
@@ -814,7 +858,7 @@ Time: 30 minutes
 
 ---
 
-#### Chapter 12: Priority Scheduling (Week 17)
+#### Chapter 13: Priority Scheduling (Week 18) - was Chapter 12
 **Reference:**
 - `chapter_breakdown.md` → Part III → Chapter 12
 - `control_plane_interfaces.md` → Phase 3 (SchedulingPolicy)
@@ -838,11 +882,11 @@ Time: 30 minutes
 - [ ] Fairness tests
 - [ ] Performance analysis
 
-**Dependencies:** Chapter 11 complete
+**Dependencies:** Chapter 12 complete
 
 ---
 
-#### Chapter 13: Resource Management (Week 18)
+#### Chapter 14: Resource Management (Week 19) - was Chapter 13
 **Reference:**
 - `chapter_breakdown.md` → Part III → Chapter 13
 - `control_plane_interfaces.md` → Phase 3 (ResourceAllocator)
@@ -866,11 +910,11 @@ Time: 30 minutes
 - [ ] Capacity dashboard
 - [ ] Utilization reports
 
-**Dependencies:** Chapter 12 complete
+**Dependencies:** Chapter 13 complete
 
 ---
 
-#### Chapter 14: Cost Tracking (Week 19)
+#### Chapter 15: Cost Tracking (Week 20) - was Chapter 14
 **Reference:**
 - `chapter_breakdown.md` → Part III → Chapter 14
 - `control_plane_interfaces.md` → Phase 3 (CostTracker)
@@ -894,11 +938,11 @@ Time: 30 minutes
 - [ ] Cost reports
 - [ ] Forecasting tools
 
-**Dependencies:** Chapter 13 complete
+**Dependencies:** Chapter 14 complete
 
 ---
 
-#### Chapter 15: Distributed Inference (Week 20-21)
+#### Chapter 16: Distributed Inference (Week 21-22) - was Chapter 15
 **Reference:** `chapter_breakdown.md` → Part III → Chapter 15
 
 **Writing Steps:**
@@ -930,11 +974,11 @@ Time: 30 minutes
 
 ---
 
-### Phase 5: Part IV - Inference Lab (Chapters 16-18)
+### Phase 5: Part IV - Inference Lab (Chapters 17-19)
 
 **Target: 6-8 weeks**
 
-#### Chapter 16: Planning & Economics (Week 22-23)
+#### Chapter 17: Planning & Economics (Week 23-24) - was Chapter 16
 **Reference:** `chapter_breakdown.md` → Part IV → Chapter 16
 
 **Writing Steps:**
@@ -968,7 +1012,7 @@ Time: 30 minutes
 
 ---
 
-#### Chapter 17: Building Complete Platform (Week 24-27)
+#### Chapter 18: Building Complete Platform (Week 25-28) - was Chapter 17
 **Reference:**
 - `chapter_breakdown.md` → Part IV → Chapter 17
 - `control_plane_interfaces.md` → Phase 4 (all interfaces)
@@ -1018,13 +1062,13 @@ Time: 30 minutes
 - [ ] API client SDK
 - [ ] 400B deployment (Qwen 2.5 Coder)
 
-**Dependencies:** Chapters 16 complete
+**Dependencies:** Chapter 17 complete
 
 **Note:** This is the most complex chapter - allocate extra time
 
 ---
 
-#### Chapter 18: Operations & Scaling (Week 28-29)
+#### Chapter 19: Operations & Scaling (Week 29-30) - was Chapter 18
 **Reference:** `chapter_breakdown.md` → Part IV → Chapter 18
 
 **Writing Steps:**
@@ -1069,7 +1113,7 @@ Time: 30 minutes
 - [ ] Security audit
 - [ ] Disaster recovery plan
 
-**Dependencies:** Chapter 17 complete
+**Dependencies:** Chapter 18 complete
 
 **Milestone:** End of Part IV - Complete inference lab platform
 
@@ -1390,23 +1434,23 @@ interface. We'll now extend this with the `RateLimiter` interface
 
 ## Estimated Timeline
 
-**Total Time: 32 weeks (8 months)**
+**Total Time: 34 weeks (~8.5 months)**
 
 ```
-Phase 1: Preparation           2 weeks
-Phase 2: Part I (Ch 1-5.5)    10 weeks
-Phase 3: Part II (Ch 6-10)    10 weeks
-Phase 4: Part III (Ch 11-15)  10 weeks
-Phase 5: Part IV (Ch 16-18)    8 weeks
-Phase 6: Appendices            3 weeks
-Final: Review & Polish         1 week
-─────────────────────────────────────
-Total:                        32 weeks
+Phase 1: Preparation            2 weeks
+Phase 2: Part I (Ch 1-6.5)     12 weeks  (was 10, +1 for new Ch 2)
+Phase 3: Part II (Ch 7-11)     10 weeks  (was Ch 6-10)
+Phase 4: Part III (Ch 12-16)   10 weeks  (was Ch 11-15)
+Phase 5: Part IV (Ch 17-19)     8 weeks  (was Ch 16-18)
+Phase 6: Appendices             3 weeks
+Final: Review & Polish          1 week
+─────────────────────────────────────────
+Total:                         34 weeks
 ```
 
-**Accelerated Timeline: 24 weeks (6 months)**
+**Accelerated Timeline: 26 weeks (6.5 months)**
 - Write 2 chapters per week
-- Skip Chapter 5.5 (move to appendix)
+- Skip Chapter 6.5 (move to appendix)
 - Combine some appendices
 
 **Extended Timeline: 52 weeks (1 year)**
@@ -1504,6 +1548,15 @@ Closes #issue-number (if applicable)
 8. Cost analysis throughout
 9. Real-world focus
 10. Have fun - you're teaching something valuable!
+
+**Chapter 2 Rationale:**
+Chapter 2 "How LLMs Work" was added to provide conceptual foundation before diving into hardware. Readers will understand:
+- Why transformers need so much memory (attention mechanism)
+- Why KV cache exists (optimization for autoregressive generation)
+- What the "billions" in 7B/70B actually mean (parameters)
+- Key metrics (TTFT, ITL) and what affects them
+
+This makes Chapter 3 (Hardware) much more grounded—when we calculate KV cache memory, readers understand *why* it matters.
 
 **Success Criteria:**
 - Reader can deploy 7B model (Part I)

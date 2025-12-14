@@ -1,122 +1,151 @@
-%%%%%%%%%%%%%%%%%%%%% chapter12.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%% chapter11.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% Chapter 12: Usage Tracking and Billing
+% Chapter 11: Multi-Tenant Architecture
 %
 %%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Usage Tracking and Billing}
-\label{ch:billing}
+\chapter{Multi-Tenant Architecture}
+\label{ch:multi-tenant}
 
-\abstract*{Monetizing your inference platform requires accurate usage tracking and billing. This chapter covers metering token usage, designing a billing data model, integrating with payment providers (Stripe), and handling edge cases like failures and refunds. We build a usage tracking system that provides both real-time visibility and accurate billing.}
+\abstract*{Serving multiple organizations requires careful architectural decisions. This chapter covers tenant isolation strategies, data separation, resource allocation, and the organizational model that underlies a multi-tenant inference platform. We design a system that provides strong isolation while efficiently sharing underlying infrastructure.}
 
-\abstract{Monetizing your inference platform requires accurate usage tracking and billing. This chapter covers metering token usage, designing a billing data model, integrating with payment providers (Stripe), and handling edge cases like failures and refunds. We build a usage tracking system that provides both real-time visibility and accurate billing.}
-
-% =============================================================================
-\section{Usage Metering}
-\label{sec:metering}
-% =============================================================================
-
-% TODO: What to track
-% - Input tokens
-% - Output tokens
-% - Model used
-% - Request metadata
+\abstract{Serving multiple organizations requires careful architectural decisions. This chapter covers tenant isolation strategies, data separation, resource allocation, and the organizational model that underlies a multi-tenant inference platform. We design a system that provides strong isolation while efficiently sharing underlying infrastructure.}
 
 % =============================================================================
-\section{Billing Models}
-\label{sec:billing-models}
+\section{Multi-Tenancy Concepts}
+\label{sec:mt-concepts}
 % =============================================================================
 
-\subsection{Per-Token Pricing}
-\label{subsec:per-token}
-
-% TODO: Pay for what you use
-
-\subsection{Subscription Tiers}
-\label{subsec:subscription}
-
-% TODO: Monthly plans
-
-\subsection{Hybrid Approach}
-\label{subsec:hybrid-billing}
-
-% TODO: Base + usage
+% TODO: Foundational concepts
+% - What is multi-tenancy
+% - Why it matters for inference
+% - Isolation vs sharing trade-offs
 
 % =============================================================================
-\section{Usage Data Model}
-\label{sec:usage-model}
+\section{Isolation Models}
+\label{sec:isolation-models}
 % =============================================================================
 
-\begin{programcode}{Usage Event Model}
+\subsection{Shared Everything}
+\label{subsec:shared-everything}
+
+% TODO: Single pool approach
+% - All tenants share resources
+% - Simple but risky
+% - Noisy neighbor problem
+
+\subsection{Namespace Isolation}
+\label{subsec:namespace-isolation}
+
+% TODO: Logical separation
+% - Separate data but shared compute
+% - Good balance for most cases
+
+\subsection{Dedicated Resources}
+\label{subsec:dedicated-resources}
+
+% TODO: Physical separation
+% - Dedicated GPUs per tenant
+% - Maximum isolation
+% - Enterprise tier
+
+% =============================================================================
+\section{Tenant Data Model}
+\label{sec:tenant-model}
+% =============================================================================
+
+\begin{programcode}{Tenant Data Model}
 \begin{lstlisting}[language=Go]
-// internal/billing/models.go
+// internal/tenant/models.go
 
-type UsageEvent struct {
-    ID              string    `json:"id"`
-    TenantID        string    `json:"tenant_id"`
-    UserID          string    `json:"user_id"`
-    RequestID       string    `json:"request_id"`
-    Model           string    `json:"model"`
-    InputTokens     int       `json:"input_tokens"`
-    OutputTokens    int       `json:"output_tokens"`
-    CostCents       int64     `json:"cost_cents"`
-    Timestamp       time.Time `json:"timestamp"`
+type Tenant struct {
+    ID            string    `json:"id"`
+    Name          string    `json:"name"`
+    Tier          TenantTier `json:"tier"`
+    Status        TenantStatus `json:"status"`
+    Settings      TenantSettings `json:"settings"`
+    ResourceQuota ResourceQuota `json:"resource_quota"`
+    CreatedAt     time.Time `json:"created_at"`
 }
 
-type UsageSummary struct {
-    TenantID        string    `json:"tenant_id"`
-    PeriodStart     time.Time `json:"period_start"`
-    PeriodEnd       time.Time `json:"period_end"`
-    TotalRequests   int64     `json:"total_requests"`
-    TotalInputToks  int64     `json:"total_input_tokens"`
-    TotalOutputToks int64     `json:"total_output_tokens"`
-    TotalCostCents  int64     `json:"total_cost_cents"`
+type TenantTier string
+
+const (
+    TierFree       TenantTier = "free"
+    TierStarter    TenantTier = "starter"
+    TierPro        TenantTier = "pro"
+    TierEnterprise TenantTier = "enterprise"
+)
+
+type TenantSettings struct {
+    AllowedModels     []string `json:"allowed_models"`
+    MaxContextLength  int      `json:"max_context_length"`
+    CustomEndpoint    bool     `json:"custom_endpoint"`
+    DataRetention     int      `json:"data_retention_days"`
+    IsolationLevel    string   `json:"isolation_level"`
+}
+
+type ResourceQuota struct {
+    RequestsPerMinute   int   `json:"requests_per_minute"`
+    TokensPerMonth      int64 `json:"tokens_per_month"`
+    MaxConcurrent       int   `json:"max_concurrent"`
+    DedicatedGPUs       int   `json:"dedicated_gpus"`
 }
 \end{lstlisting}
 \end{programcode}
 
 % =============================================================================
-\section{Payment Integration}
-\label{sec:payment-integration}
+\section{Request Context}
+\label{sec:request-context}
 % =============================================================================
 
-% TODO: Stripe integration
-% - Customer management
-% - Subscription handling
-% - Usage-based billing
-% - Webhooks
+% TODO: Propagating tenant info
+% - Tenant in context
+% - Throughout request lifecycle
 
 % =============================================================================
-\section{Invoice Generation}
-\label{sec:invoicing}
+\section{Resource Allocation}
+\label{sec:resource-allocation}
 % =============================================================================
 
-% TODO: Creating invoices
-% - Monthly aggregation
-% - Line items
-% - PDF generation
+% TODO: Fair sharing
+
+\subsection{Shared Pool Model}
+\label{subsec:shared-pool}
+
+% TODO: Default approach
+
+\subsection{Reserved Capacity}
+\label{subsec:reserved-capacity}
+
+% TODO: Guaranteed minimums
+
+\subsection{Dynamic Allocation}
+\label{subsec:dynamic-allocation}
+
+% TODO: Based on demand
 
 % =============================================================================
-\section{Error Handling}
-\label{sec:billing-errors}
+\section{Noisy Neighbor Prevention}
+\label{sec:noisy-neighbor}
 % =============================================================================
 
-% TODO: Edge cases
-% - Failed requests (don't charge)
-% - Partial responses
-% - Refunds
+% TODO: Preventing one tenant from affecting others
+% - Rate limiting per tenant
+% - Resource limits
+% - Queue isolation
 
 % =============================================================================
 \section{Summary}
-\label{sec:ch12-summary}
+\label{sec:ch11-summary}
 % =============================================================================
 
 \begin{important}{Key Takeaways}
 \begin{itemize}
-\item Accurate usage metering is fundamental to billing
-\item Track both input and output tokens with model context
-\item Stripe provides robust billing infrastructure
-\item Handle edge cases gracefully (failures, refunds)
+\item Multi-tenancy enables efficient resource sharing
+\item Isolation level should match tenant tier
+\item Noisy neighbor problems require proactive prevention
+\item Tenant context must flow through the entire request
 \end{itemize}
 \end{important}
 
@@ -124,8 +153,8 @@ type UsageSummary struct {
 \addcontentsline{toc}{section}{Problems}
 
 \begin{prob}
-\label{prob:ch12-usage-tracker}
-Implement a usage tracking service that records all inference requests and aggregates usage per tenant per billing period.
+\label{prob:ch11-tenant-service}
+Implement a \texttt{TenantService} that manages tenant lifecycle including creation, updates, and suspension.
 \end{prob}
 
-\input{chapters/references12}
+\input{chapters/references11}

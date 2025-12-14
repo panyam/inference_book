@@ -1,152 +1,102 @@
-%%%%%%%%%%%%%%%%%%%%% chapter16.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%% chapter15.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% Chapter 16: 400B Deployment and H100 Optimization
+% Chapter 15: 70B Deployment
 %
 %%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{400B Deployment and H100 Optimization}
-\label{ch:400b-deployment}
+\chapter{70B Model Deployment}
+\label{ch:70b-deployment}
 
-\abstract*{400B models represent the frontier of self-hosted inference. This chapter covers H100 hardware characteristics, deploying massive models across GPU clusters, network topology optimization, and the economics of large-scale inference. We configure an 8-GPU H100 deployment capable of serving production traffic.}
+\abstract*{This chapter synthesizes everything from Part III into a complete 70B deployment. We cover the full setup with multi-GPU inference, tenant management, billing integration, and production monitoring. By the end, you'll have Control Plane v0.3---a multi-tenant AI platform serving enterprise customers.}
 
-\abstract{400B models represent the frontier of self-hosted inference. This chapter covers H100 hardware characteristics, deploying massive models across GPU clusters, network topology optimization, and the economics of large-scale inference. We configure an 8-GPU H100 deployment capable of serving production traffic.}
-
-% =============================================================================
-\section{H100 Hardware Deep Dive}
-\label{sec:h100-hardware}
-% =============================================================================
-
-% TODO: H100 characteristics
-% - Specs: 80GB HBM3, 3TB/s bandwidth
-% - Tensor cores
-% - FP8 support
-% - NVLink 4.0
-
-\subsection{H100 vs A100}
-\label{subsec:h100-vs-a100}
-
-% TODO: Comparison
-% - Performance
-% - Memory bandwidth
-% - Pricing
-% - Availability
-
-\subsection{SXM vs PCIe}
-\label{subsec:sxm-pcie}
-
-% TODO: Form factors
-% - SXM for NVLink
-% - PCIe for flexibility
+\abstract{This chapter synthesizes everything from Part III into a complete 70B deployment. We cover the full setup with multi-GPU inference, tenant management, billing integration, and production monitoring. By the end, you'll have Control Plane v0.3---a multi-tenant AI platform serving enterprise customers.}
 
 % =============================================================================
-\section{400B Model Requirements}
-\label{sec:400b-requirements}
+\section{Deployment Architecture}
+\label{sec:70b-architecture}
 % =============================================================================
 
-% TODO: What it takes
-% - Memory calculation
-% - Communication requirements
-% - Minimum GPU count
-
-\begin{svgraybox}
-\textbf{400B Model Memory Requirements:}
-
-\begin{itemize}
-\item FP16 weights: $400B \times 2$ bytes = 800GB
-\item INT8 quantized: $400B \times 1$ byte = 400GB
-\item INT4 quantized: $400B \times 0.5$ bytes = 200GB
-\item KV cache (4K context, batch 8): ~50GB additional
-\item Total with overhead (INT4): ~280GB = 4x H100 minimum
-\end{itemize}
-
-\textbf{Recommended:} 8x H100 80GB for production headroom
-\end{svgraybox}
+% TODO: Full architecture diagram
+% - Multiple inference nodes
+% - Control plane cluster
+% - Database
+% - Monitoring
 
 % =============================================================================
-\section{Network Topology}
-\label{sec:topology-400b}
+\section{Infrastructure Setup}
+\label{sec:infra-setup}
 % =============================================================================
 
-% TODO: Optimal connectivity
-% - NVSwitch
-% - InfiniBand
-% - Topology considerations
+% TODO: Setting up the infrastructure
+% - GPU nodes
+% - Kubernetes or Docker Swarm
+% - Networking
 
 % =============================================================================
-\section{Deployment Configuration}
-\label{sec:400b-config}
+\section{Control Plane v0.3 Configuration}
+\label{sec:cpv03-config}
 % =============================================================================
 
-\begin{programcode}{400B Deployment with vLLM}
-\begin{lstlisting}[language=bash]
-# 8-GPU H100 configuration for 400B model
-python -m vllm.entrypoints.openai.api_server \
-    --model meta-llama/Llama-3.1-400B-Instruct \
-    --tensor-parallel-size 8 \
-    --dtype float16 \
-    --max-model-len 8192 \
-    --gpu-memory-utilization 0.95 \
-    --max-num-batched-tokens 8192 \
-    --enable-prefix-caching \
-    --enable-chunked-prefill
-\end{lstlisting}
-\end{programcode}
+% TODO: Complete configuration
+% - All features enabled
+% - Production tuning
 
 % =============================================================================
-\section{Economics at Scale}
-\label{sec:economics-scale}
+\section{Deployment Checklist}
+\label{sec:deployment-checklist}
 % =============================================================================
 
-% TODO: Cost analysis
-% - Hardware cost (8x H100)
-% - Power and cooling
-% - Operational costs
-% - Cost per token
-
-\subsection{Build vs Rent}
-\label{subsec:build-rent-400b}
-
-% TODO: The big decision
-% - Ownership: $250K+ hardware
-% - Rental: $20-40/hour cloud
-
-\subsection{Break-Even Analysis}
-\label{subsec:break-even-400b}
-
-% TODO: When to own
-% - High utilization threshold
-% - Timeline considerations
+% TODO: Pre-launch checklist
+% - Security
+% - Monitoring
+% - Backup
+% - Documentation
 
 % =============================================================================
-\section{Performance Optimization}
-\label{sec:400b-optimization}
+\section{Operations Runbook}
+\label{sec:runbook}
 % =============================================================================
 
-% TODO: Squeezing out performance
-% - FP8 quantization
-% - Speculative decoding
-% - Batch optimization
+% TODO: Day-to-day operations
+% - Scaling
+% - Updates
+% - Incident response
 
 % =============================================================================
 \section{Summary}
-\label{sec:ch16-summary}
+\label{sec:ch15-summary}
 % =============================================================================
 
 \begin{important}{Key Takeaways}
 \begin{itemize}
-\item 400B models require 8+ H100 GPUs
-\item NVLink is essential for performance
-\item Economics favor ownership at high utilization
-\item Proper configuration can double throughput
+\item 70B deployment requires careful planning
+\item Multi-GPU coordination is handled by vLLM
+\item Control Plane v0.3 provides full multi-tenancy
+\item Operational procedures are essential
 \end{itemize}
 \end{important}
+
+\begin{svgraybox}
+\textbf{Part III Complete!}
+
+You now have Control Plane v0.3, a multi-tenant AI platform with:
+\begin{itemize}
+\item Tenant isolation and management
+\item Usage tracking and billing
+\item Multi-GPU distributed inference
+\item Intelligent model routing
+\item Production deployment patterns
+\end{itemize}
+
+In Part IV, we'll push to 400B models and build CodeLab, a commercial coding assistant.
+\end{svgraybox}
 
 \section*{Problems}
 \addcontentsline{toc}{section}{Problems}
 
 \begin{prob}
-\label{prob:ch16-cost-model}
-Create a detailed cost model comparing owning 8x H100 versus renting from cloud providers. Include all costs over 3 years.
+\label{prob:ch15-deployment}
+Deploy a complete 70B inference stack with at least 3 tenants. Document the process and measure end-to-end latency.
 \end{prob}
 
-\input{chapters/references16}
+\input{chapters/references15}

@@ -1,342 +1,373 @@
-%%%%%%%%%%%%%%%%%%%%% chapter02.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-% Chapter 2: Hardware Fundamentals
-%
-%%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\chapter{Hardware Fundamentals}
-\label{ch:hardware}
-
-\abstract*{Understanding hardware is essential for making informed decisions about self-hosted inference. This chapter covers how transformers use memory during inference, VRAM calculation formulas, CPU vs GPU trade-offs, and a comprehensive comparison of available hardware options. We also analyze the economics of owned versus rented infrastructure to help you make the right choice for your situation.}
-
-\abstract{Understanding hardware is essential for making informed decisions about self-hosted inference. This chapter covers how transformers use memory during inference, VRAM calculation formulas, CPU vs GPU trade-offs, and a comprehensive comparison of available hardware options. We also analyze the economics of owned versus rented infrastructure to help you make the right choice for your situation.}
-
 % =============================================================================
-\section{How Transformers Use Memory}
-\label{sec:transformer-memory}
+% Chapter 2: How LLMs Work
+% =============================================================================
+% This chapter provides the conceptual foundation for understanding hardware
+% requirements. Readers will understand WHY transformers need memory before
+% Chapter 3 calculates HOW MUCH memory.
 % =============================================================================
 
-Before selecting hardware, you need to understand what consumes memory during inference. Three components dominate: model weights, the KV cache, and working memory for activations. Each scales differently with model size and usage patterns.
+\chapter{How LLMs Work}
+\label{ch:how-llms-work}
 
-\subsection{Model Weights}
-\label{subsec:model-weights}
+\abstract*{Before diving into hardware requirements and VRAM calculations, we need to understand what's actually happening inside these models. This chapter explains transformer architecture from a systems perspective---not the math, but the components and data flow that determine memory usage and performance. By the end, you'll understand why KV cache exists, what the ``billions'' in 7B actually means, and what metrics matter for inference.}
 
-Model weights are the learned parameters---the numbers that make a model behave intelligently. A "7B model" has approximately 7 billion parameters. Each parameter requires storage, and the memory needed depends on numerical precision.
+% =============================================================================
+\section{From Neural Networks to Transformers}
+\label{sec:nn-to-transformers}
+% =============================================================================
 
-The formula is straightforward:
+% TODO: Section 2.1
+% - Brief neural network history (1-2 paragraphs)
+% - RNNs and the sequential bottleneck
+% - "Attention Is All You Need" breakthrough
+% - Why transformers dominate for language (parallelization)
+
+\subsection{The Sequential Bottleneck}
+\label{subsec:sequential-bottleneck}
+
+% TODO: RNNs process tokens one at a time, can't parallelize
+
+\subsection{Attention Changes Everything}
+\label{subsec:attention-changes}
+
+% TODO: 2017 paper, parallel processing of all tokens
+
+% =============================================================================
+\section{Inside a Transformer}
+\label{sec:inside-transformer}
+% =============================================================================
+
+% TODO: Section 2.2 - The architecture from a systems perspective
+
+\subsection{The High-Level View}
+\label{subsec:high-level-view}
+
+% TODO: Encoder-decoder vs decoder-only, why decoder-only dominates for LLMs
+
+\subsection{Attention: What It Actually Does}
+\label{subsec:attention-mechanism}
+
+% TODO: Explain attention without matrices
+% - Each token looks at all previous tokens
+% - Decides which tokens are relevant for predicting the next one
+% - Query, Key, Value analogy (like a database lookup)
+
+\subsection{Multi-Head Attention}
+\label{subsec:multi-head-attention}
+
+% TODO: Why multiple heads?
+% - Different heads learn different relationships
+% - One head might track syntax, another semantics
+% - More heads = more parallel relationship tracking
+
+\subsection{Feed-Forward Networks}
+\label{subsec:feed-forward}
+
+% TODO: The "thinking" layer between attention layers
+% - Processes each token independently
+% - Where much of the model's "knowledge" is stored
+
+\subsection{Layers: Stacking the Blocks}
+\label{subsec:layers}
+
+% TODO:
+% - Each layer = attention + feed-forward
+% - Typical models: 32 layers (7B) to 80+ layers (70B+)
+% - Deeper = more sophisticated reasoning
+
+\subsection{What Are the Billions?}
+\label{subsec:parameters}
+
+% TODO: Demystify parameter counts
+% - Parameters = weights = numbers the model learned during training
+% - 7B = 7 billion floating point numbers
+% - Where they live: attention weights, feed-forward weights, embeddings
+% - Simple formula: layers × (attention params + ffn params) + embeddings
+
+\begin{svgraybox}
+\textbf{Parameter Count Breakdown (Approximate):}
+
+For a typical 7B model with 32 layers:
+\begin{itemize}
+\item Embedding layer: $\sim$0.5B parameters
+\item Per layer (attention + FFN): $\sim$200M parameters
+\item 32 layers $\times$ 200M = $\sim$6.4B parameters
+\item Output layer + other: $\sim$0.1B parameters
+\item Total: $\sim$7B parameters
+\end{itemize}
+\end{svgraybox}
+
+% =============================================================================
+\section{The Inference Lifecycle}
+\label{sec:inference-lifecycle}
+% =============================================================================
+
+% TODO: Section 2.3 - What happens from prompt to response
+
+\subsection{Tokenization: Text to Numbers}
+\label{subsec:tokenization}
+
+% TODO:
+% - Models don't see text, they see token IDs
+% - Vocabulary of ~32k-128k tokens
+% - Subword tokenization (BPE, SentencePiece)
+% - Example: "Hello world" → [15496, 995]
+
+\begin{lstlisting}[language=Python,caption={Tokenization example}]
+# Example tokenization (conceptual)
+text = "Hello, how are you?"
+tokens = ["Hello", ",", " how", " are", " you", "?"]
+token_ids = [15496, 11, 703, 527, 499, 30]
+\end{lstlisting}
+
+\subsection{The Prefill Phase}
+\label{subsec:prefill-phase}
+
+% TODO:
+% - Processing the entire prompt at once
+% - All prompt tokens processed in parallel
+% - Compute-bound phase
+% - Builds initial KV cache
+% - This is why long prompts take time before first token
+
+\subsection{The Decode Phase}
+\label{subsec:decode-phase}
+
+% TODO:
+% - Generating one token at a time
+% - Each new token depends on all previous tokens
+% - Memory-bound phase (reading KV cache)
+% - This is why generation speed is measured in tokens/second
+
+\subsection{The Autoregressive Loop}
+\label{subsec:autoregressive-loop}
+
+% TODO:
+% - Generate token → append to sequence → generate next token
+% - Why it's called "autoregressive"
+% - Each iteration: read KV cache + compute attention for new token
+% - Loop until: EOS token, max length, or stop sequence
+
+\begin{svgraybox}
+\textbf{The Generation Loop:}
+
+\begin{enumerate}
+\item Process prompt (prefill) $\rightarrow$ get first token
+\item Append token to sequence
+\item Compute attention for new token using KV cache
+\item Sample next token from probability distribution
+\item Repeat steps 2-4 until stopping condition
+\end{enumerate}
+\end{svgraybox}
+
+\subsection{Stopping Conditions}
+\label{subsec:stopping-conditions}
+
+% TODO:
+% - End-of-sequence (EOS) token
+% - Maximum token limit (num_predict/max_tokens)
+% - Stop sequences (custom strings that halt generation)
+
+% =============================================================================
+\section{Why KV Cache Exists}
+\label{sec:kv-cache}
+% =============================================================================
+
+% TODO: Section 2.4 - The key optimization that makes generation practical
+
+\subsection{The Naive Approach}
+\label{subsec:naive-approach}
+
+% TODO:
+% - Without optimization: recompute attention for ALL tokens every step
+% - Token 100 requires computing attention over tokens 1-99
+% - Token 101 requires computing attention over tokens 1-100 (redundant!)
+% - Complexity: O(n²) per token generated
+% - This would be impossibly slow
+
+\subsection{The Key-Value Cache Optimization}
+\label{subsec:kv-optimization}
+
+% TODO:
+% - Key insight: K and V for previous tokens don't change
+% - Cache them! Only compute K,V for the new token
+% - Reuse cached K,V when computing attention
+% - Complexity drops dramatically
+
+\begin{important}{The KV Cache Trade-off}
+KV cache trades memory for compute. Instead of recalculating attention over all previous tokens, we store their key-value pairs and reuse them. This makes generation fast but consumes memory proportional to sequence length.
+\end{important}
+
+\subsection{How KV Cache Grows}
+\label{subsec:kv-cache-growth}
+
+% TODO:
+% - Memory grows linearly with sequence length
+% - Formula: 2 × layers × heads × head_dim × sequence_length × bytes_per_param
+% - Example: 7B model, 4096 context, FP16 → ~1GB KV cache
+% - This is why context length is limited
+
+\begin{svgraybox}
+\textbf{KV Cache Size Formula:}
 
 \begin{equation}
-\text{Weight Memory} = \text{Parameters} \times \text{Bytes per Parameter}
-\end{equation}
-
-At full precision (FP32), each parameter uses 4 bytes. A 7B model requires $7 \times 10^9 \times 4 = 28$ GB just for weights---more than most consumer GPUs offer. This is why nobody runs large models at FP32 for inference.
-
-Half precision (FP16 or BF16) cuts this in half: 2 bytes per parameter, so 14 GB for a 7B model. This fits on an RTX 4090 (24 GB) with room to spare, but exceeds an RTX 4070 Ti (16 GB) when you account for other memory needs.
-
-Quantization reduces precision further. At 4-bit precision (INT4), each parameter uses only 0.5 bytes, bringing our 7B model down to 3.5 GB. This is why quantized models run on laptops and modest GPUs---the memory reduction is dramatic:
-
-\begin{table}[htbp]
-\centering
-\caption{Weight memory for common model sizes at different precisions.}
-\label{tab:weight-memory}
-\begin{tabular}{lrrrr}
-\toprule
-\textbf{Model} & \textbf{FP32} & \textbf{FP16} & \textbf{INT8} & \textbf{INT4} \\
-\midrule
-7B   & 28 GB  & 14 GB  & 7 GB   & 3.5 GB \\
-13B  & 52 GB  & 26 GB  & 13 GB  & 6.5 GB \\
-30B  & 120 GB & 60 GB  & 30 GB  & 15 GB \\
-70B  & 280 GB & 140 GB & 70 GB  & 35 GB \\
-400B & 1.6 TB & 800 GB & 400 GB & 200 GB \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-These numbers represent minimums---the weights alone, with nothing else. Actual VRAM usage is higher due to the KV cache and working memory we'll cover next.
-
-\subsection{The KV Cache}
-\label{subsec:kv-cache}
-
-The KV cache is the second major memory consumer, and unlike weights, it grows during inference. Understanding it explains why long conversations consume more memory than short ones.
-
-During autoregressive generation, the model generates one token at a time. For each new token, it must "attend" to all previous tokens---the attention mechanism needs to compute relationships between the new token and everything that came before. Without caching, this would require reprocessing the entire context for every generated token, making generation quadratically slower.
-
-The KV cache stores the key and value vectors computed during attention. Once computed, these don't change, so caching them avoids redundant computation. The trade-off: memory consumption that grows linearly with context length.
-
-The KV cache size depends on model architecture:
-
-\begin{equation}
-\text{KV Cache} = 2 \times L \times H \times D \times C \times B \times N
+\text{KV Cache (bytes)} = 2 \times L \times H \times D \times S \times B
 \end{equation}
 
 Where:
 \begin{itemize}
 \item $L$ = number of layers
-\item $H$ = number of attention heads (or KV heads for GQA)
+\item $H$ = number of attention heads
 \item $D$ = dimension per head
-\item $C$ = context length (tokens)
+\item $S$ = sequence length
 \item $B$ = bytes per value (2 for FP16)
-\item $N$ = batch size
-\item Factor of 2 accounts for both keys and values
+\item Factor of 2 = one for Keys, one for Values
 \end{itemize}
-
-For a typical 7B model (32 layers, 32 heads, 128 dimensions per head) at FP16:
-
-\begin{equation}
-\text{KV Cache} = 2 \times 32 \times 32 \times 128 \times C \times 2 = 524,288 \times C \text{ bytes}
-\end{equation}
-
-At 4096 context tokens: $\sim$2 GB. At 32K context: $\sim$16 GB. At 128K context: $\sim$64 GB---potentially exceeding the weight memory itself.
-
-This is why long-context inference is memory-intensive. A 7B model that fits comfortably in 8 GB VRAM at 4K context may require 24 GB at 32K context. Grouped Query Attention (GQA), used in newer models like Llama 3 and Qwen 2.5, reduces KV cache size by sharing key-value heads, typically by 4--8x.
-
-\subsection{Activation and Working Memory}
-\label{subsec:activation-memory}
-
-Beyond weights and KV cache, inference requires working memory for intermediate computations. This includes attention scores, feed-forward network activations, and temporary buffers for matrix operations.
-
-For a single forward pass, activation memory scales with model dimensions and batch size:
-
-\begin{equation}
-\text{Activation Memory} \approx B \times C \times D_{\text{model}} \times L \times k
-\end{equation}
-
-Where $k$ is a small constant (typically 2--4) depending on the engine's memory management. For a 7B model with batch size 1 and 4K context, activations consume roughly 200--500 MB.
-
-This seems small compared to weights and KV cache, but it matters for two reasons. First, activation memory must be allocated contiguously, and memory fragmentation can prevent allocation even when total free memory appears sufficient. Second, during batched inference, activation memory grows linearly with batch size.
-
-\subsubsection*{The Overhead Budget}
-
-Practical VRAM planning requires a safety margin. CUDA maintains its own memory pools, the inference engine has overhead, and memory fragmentation accumulates over time. A conservative estimate adds 10--20\% to your calculated requirements:
-
-\begin{equation}
-\text{Total VRAM} \approx (\text{Weights} + \text{KV Cache} + \text{Activations}) \times 1.15
-\end{equation}
-
-If your calculations show 20 GB needed, plan for 23 GB to be safe. This matters when choosing between a 24 GB GPU that barely fits and a 48 GB GPU with comfortable headroom. The latter allows longer contexts, larger batches, or simply more reliable operation.
-
-% =============================================================================
-\section{VRAM Calculation}
-\label{sec:vram-calculation}
-% =============================================================================
-
-% TODO: The master formula
-
-\begin{svgraybox}
-\textbf{VRAM Estimation Formula:}
-
-For a model with $P$ parameters at precision $B$ bytes:
-
-\begin{equation}
-\text{VRAM}_{\text{base}} = P \times B
-\end{equation}
-
-For inference with context length $C$ and batch size $N$:
-
-\begin{equation}
-\text{VRAM}_{\text{total}} \approx P \times B + \text{KV\_cache}(C, N) + \text{overhead}
-\end{equation}
-
-Where overhead is typically 10--20\% additional memory.
 \end{svgraybox}
 
-\subsection{Precision and Memory}
-\label{subsec:precision}
+\subsection{The Memory vs Compute Trade-off}
+\label{subsec:memory-compute-tradeoff}
 
-% TODO: Table of precision formats
-% | Precision | Bytes | Use Case |
-% | FP32 | 4 | Training (rarely inference) |
-% | FP16 | 2 | Standard GPU inference |
-% | BF16 | 2 | Standard GPU inference |
-% | INT8 | 1 | Quantized inference |
-% | INT4 | 0.5 | Aggressive quantization |
-
-\subsection{Worked Examples}
-\label{subsec:vram-examples}
-
-% TODO: Calculate for our target models
-% - 7B model at different precisions
-% - 30B model requirements
-% - 70B model requirements
-% - 400B model requirements
+% TODO:
+% - More memory = longer contexts possible
+% - During prefill: compute-bound (processing prompt)
+% - During decode: memory-bound (reading KV cache)
+% - This is why decode phase benefits from faster memory bandwidth
 
 % =============================================================================
-\section{CPU vs GPU Inference}
-\label{sec:cpu-vs-gpu}
+\section{Key Metrics for Inference}
+\label{sec:inference-metrics}
 % =============================================================================
 
-% TODO: When each makes sense
+% TODO: Section 2.5 - What to measure and why
 
-\subsection{CPU Inference}
-\label{subsec:cpu-inference}
+\subsection{Time to First Token (TTFT)}
+\label{subsec:ttft}
 
-% TODO: CPU characteristics
-% - Larger memory (RAM vs VRAM)
-% - Lower throughput
-% - llama.cpp optimization
-% - When it works well
+% TODO:
+% - Time from request to first token of response
+% - Dominated by prefill phase
+% - Affected by prompt length
+% - User perception: "thinking time"
 
-\subsection{GPU Inference}
-\label{subsec:gpu-inference}
+\subsection{Inter-Token Latency (ITL)}
+\label{subsec:itl}
 
-% TODO: GPU advantages
-% - Parallelism
-% - Memory bandwidth
-% - Specialized tensor cores
-% - When it's required
+% TODO:
+% - Time between consecutive tokens
+% - Also called Time Between Tokens (TBT)
+% - Determines streaming "smoothness"
+% - Target: <50ms for real-time feel
 
-\subsection{Hybrid Approaches}
-\label{subsec:hybrid-cpu-gpu}
+\subsection{Tokens per Second}
+\label{subsec:tokens-per-second}
 
-% TODO: CPU+GPU together
-% - Offloading layers
-% - llama.cpp layer splitting
-% - Trade-offs
+% TODO:
+% - Generation speed: output tokens / time
+% - Typical ranges: 20-100 tok/s (consumer GPU), 100-500 tok/s (datacenter)
+% - Reading speed ~250 words/min ≈ 5-6 tok/s, so even slow GPUs beat reading
 
-% =============================================================================
-\section{GPU Hardware Comparison}
-\label{sec:gpu-comparison}
-% =============================================================================
+\subsection{Throughput}
+\label{subsec:throughput}
 
-% TODO: Comprehensive GPU comparison
+% TODO:
+% - Requests per second the system can handle
+% - Different from tokens/second (system vs single request)
+% - Batching increases throughput (process multiple requests)
 
-\subsection{NVIDIA Consumer GPUs}
-\label{subsec:nvidia-consumer}
+\begin{table}[htbp]
+\centering
+\caption{Inference metrics summary.}
+\label{tab:inference-metrics}
+\begin{tabular}{llll}
+\toprule
+\textbf{Metric} & \textbf{Measures} & \textbf{Target} & \textbf{Affected By} \\
+\midrule
+TTFT & Responsiveness & <1s & Prompt length, model size \\
+ITL & Streaming smoothness & <50ms & Model size, memory bandwidth \\
+Tokens/sec & Generation speed & >30 & GPU power, quantization \\
+Throughput & System capacity & Varies & Batching, hardware \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-% TODO: RTX series comparison
-% - RTX 3060 12GB
-% - RTX 3090 24GB
-% - RTX 4060 8GB
-% - RTX 4070 Ti 16GB
-% - RTX 4080 16GB
-% - RTX 4090 24GB
+\subsection{What Affects Each Metric}
+\label{subsec:metric-factors}
 
-\subsection{NVIDIA Professional GPUs}
-\label{subsec:nvidia-professional}
-
-% TODO: Workstation and datacenter
-% - RTX A4000/A5000/A6000
-% - A100 40GB/80GB
-% - H100 80GB
-% - Comparison table
-
-\subsection{AMD GPUs}
-\label{subsec:amd-gpus}
-
-% TODO: AMD options
-% - ROCm support status
-% - RX 7900 XTX
-% - Instinct MI series
-% - Trade-offs vs NVIDIA
-
-\subsection{Apple Silicon}
-\label{subsec:apple-silicon}
-
-% TODO: M-series chips
-% - Unified memory advantage
-% - M1/M2/M3 performance
-% - M1/M2/M3 Pro/Max/Ultra
-% - When they make sense
-
-\subsection{Hardware Recommendation Matrix}
-\label{subsec:hardware-matrix}
-
-% TODO: Decision matrix table
-% | Model Size | Min VRAM | Recommended | Budget Option |
-% | 7B Q4 | 4GB | RTX 4060 8GB | M1 MacBook |
-% | 7B FP16 | 14GB | RTX 4090 24GB | RTX 3090 24GB |
-% | etc. |
+% TODO:
+% - TTFT: prompt length (more tokens to process), model size
+% - ITL: memory bandwidth (reading KV cache), model size
+% - Tokens/sec: GPU compute power, quantization level
+% - Throughput: batch size, continuous batching, GPU memory
 
 % =============================================================================
-\section{Owned vs Rented Infrastructure}
-\label{sec:owned-vs-rented}
+\section{Other Model Architectures}
+\label{sec:other-architectures}
 % =============================================================================
 
-% TODO: The big economic question
+% TODO: Section 2.6 - Brief overview of non-transformer architectures
 
-\subsection{Buying Hardware}
-\label{subsec:buying-hardware}
+\subsection{Mixture of Experts (MoE)}
+\label{subsec:moe}
 
-% TODO: Ownership economics
-% - Upfront CapEx
-% - Ongoing costs (power, cooling, maintenance)
-% - Depreciation
-% - Tax implications
-% - When it makes sense
+% TODO:
+% - Not all parameters active for every token
+% - Router selects which "experts" to use
+% - Example: Mixtral 8x7B has 47B params but only 13B active
+% - Implication: faster inference, but still need memory for all params
 
-\subsection{Renting Cloud GPUs}
-\label{subsec:renting-gpus}
-
-% TODO: Rental options
-% - RunPod
-% - Vast.ai
-% - Lambda Labs
-% - Major cloud providers (AWS, GCP, Azure)
-% - Pricing comparison
-
-\subsection{Break-Even Analysis}
-\label{subsec:break-even}
-
-% TODO: When to buy vs rent
-% - Formula for break-even
-% - Worked examples
-% - Utilization factor
-% - Decision framework
-
-\begin{svgraybox}
-\textbf{Break-Even Formula:}
-
-\begin{equation}
-\text{Break-even (months)} = \frac{\text{Hardware Cost} + \text{Setup Costs}}{\text{Monthly Rental Cost} - \text{Monthly Operating Cost}}
-\end{equation}
-
-Where Monthly Operating Cost includes power, cooling, and amortized maintenance.
-\end{svgraybox}
-
-\subsection{Hybrid Strategies}
-\label{subsec:hybrid-strategies}
-
-% TODO: Best of both worlds
-% - Own base capacity
-% - Rent for burst
-% - Geographic distribution
-
-% =============================================================================
-\section{Power and Cooling Considerations}
-\label{sec:power-cooling}
-% =============================================================================
-
-% TODO: Practical infrastructure
-% - Power consumption by GPU
-% - Cooling requirements
-% - Home lab considerations
-% - Data center placement
-
-% =============================================================================
-\section{TPU as an Alternative}
-\label{sec:tpu-sidebar}
-% =============================================================================
-
-\begin{backgroundinformation}{Google Cloud TPUs}
-While this book primarily focuses on GPU-based inference, Google Cloud TPUs offer an alternative worth considering. TPUs can be 50--70\% cheaper than equivalent GPUs for sustained workloads, but require JAX-based models and are only available on Google Cloud Platform.
-
-If you're deploying on GCP with JAX models, see Appendix~\ref{ch:appendix-tpu} for complete coverage of TPU inference.
+\begin{backgroundinformation}{Mixture of Experts}
+MoE models like Mixtral 8x7B contain multiple ``expert'' networks. A router decides which experts handle each token. This means a 47B parameter model might only use 13B parameters per token, giving near-13B inference speed while retaining 47B model quality. The trade-off: you still need memory for all 47B parameters.
 \end{backgroundinformation}
+
+\subsection{Diffusion Models}
+\label{subsec:diffusion}
+
+% TODO:
+% - Used for image/video generation (Stable Diffusion, DALL-E)
+% - Different inference pattern: iterative denoising
+% - Not autoregressive, no KV cache
+% - Covered briefly; this book focuses on LLMs
+
+\subsection{Multimodal Models}
+\label{subsec:multimodal}
+
+% TODO:
+% - Handle multiple input types (text + images)
+% - Examples: LLaVA, GPT-4V
+% - Vision encoder + LLM
+% - Additional memory for image embeddings
+
+\subsection{State Space Models}
+\label{subsec:ssm}
+
+% TODO:
+% - Alternative to attention (Mamba, etc.)
+% - Linear complexity instead of quadratic
+% - No KV cache needed
+% - Emerging area, less mature tooling
 
 % =============================================================================
 \section{Summary}
 \label{sec:ch02-summary}
 % =============================================================================
 
-% TODO: Chapter summary
+% TODO: Write summary connecting to Chapter 3
+
+This chapter provided the conceptual foundation for understanding LLM inference. We traced the evolution from sequential RNNs to parallel transformers, explored the attention mechanism that allows tokens to communicate, and walked through the inference lifecycle from prompt tokenization through autoregressive generation.
+
+The key insight is the KV cache: by caching attention key-value pairs, we trade memory for dramatic compute savings. This trade-off is central to everything that follows---VRAM requirements, context length limits, and optimization strategies all flow from this fundamental architecture.
+
+With this mental model in place, Chapter~\ref{ch:hardware-fundamentals} will quantify these concepts: exactly how much memory does a 7B model need? How does quantization reduce that? When does CPU inference make sense? The formulas will make more sense now that you understand what they're measuring.
 
 \begin{important}{Key Takeaways}
 \begin{itemize}
-\item VRAM is the primary constraint for GPU inference
-\item Quantization dramatically reduces memory requirements (4x for INT4)
-\item CPU inference is viable for smaller models with enough RAM
-\item Hardware choice depends on model size, budget, and utilization
-\item Break-even between owned and rented depends on consistent usage
+\item Transformers process all tokens in parallel (prefill) then generate one at a time (decode)
+\item The ``billions'' in 7B are learnable parameters---weights stored as floating point numbers
+\item KV cache trades memory for compute, enabling fast autoregressive generation
+\item Memory grows linearly with sequence length due to KV cache
+\item Key metrics: TTFT (responsiveness), ITL (smoothness), tokens/sec (speed), throughput (capacity)
+\item MoE models have many parameters but only activate a subset per token
 \end{itemize}
 \end{important}
 
@@ -346,21 +377,21 @@ If you're deploying on GCP with JAX models, see Appendix~\ref{ch:appendix-tpu} f
 % =============================================================================
 
 \begin{prob}
-\label{prob:ch02-vram-calc}
-\textbf{VRAM Calculation}\\
-Calculate the minimum VRAM required to run a 30B parameter model at FP16 precision with a context length of 4096 tokens. Then calculate the VRAM needed if quantized to INT4.
+\label{prob:ch02-kv-cache}
+\textbf{KV Cache Calculation}\\
+A model has 32 layers, 32 attention heads, 128 dimensions per head, and uses FP16 precision. Calculate the KV cache size for a 4096-token context. Then calculate for an 8192-token context.
 \end{prob}
 
 \begin{prob}
-\label{prob:ch02-break-even}
-\textbf{Break-Even Analysis}\\
-You need to serve a 7B model 24/7. Calculate the break-even point (in months) between buying an RTX 4070 Ti (\$800) versus renting an equivalent GPU on RunPod (\$0.30/hour). Assume \$0.15/kWh electricity and 200W GPU power consumption.
+\label{prob:ch02-ttft-vs-itl}
+\textbf{TTFT vs ITL}\\
+Explain why a model might have excellent TTFT but poor ITL, or vice versa. What hardware characteristics would cause each scenario?
 \end{prob}
 
 \begin{prob}
-\label{prob:ch02-hardware-selection}
-\textbf{Hardware Selection}\\
-A startup needs to serve 1000 requests/hour with a 7B model. They have a budget of \$5,000. Recommend a hardware configuration and justify your choice, considering both owned and rented options.
+\label{prob:ch02-moe-memory}
+\textbf{MoE Memory Requirements}\\
+Mixtral 8x7B has 8 experts with 7B parameters each, but only 2 experts are active per token. Explain why you still need memory for all 47B parameters, not just 14B.
 \end{prob}
 
 \input{chapters/references02}

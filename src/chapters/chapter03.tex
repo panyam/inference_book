@@ -1,276 +1,752 @@
 %%%%%%%%%%%%%%%%%%%%% chapter03.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% Chapter 3: Model Formats and Quantization
+% Chapter 3: Hardware Fundamentals (was Chapter 2)
 %
 %%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Model Formats and Quantization}
-\label{ch:models}
+\chapter{Hardware Fundamentals}
+\label{ch:hardware-fundamentals}
 
-\abstract*{The choice of model format and quantization level directly impacts performance, quality, and resource requirements. This chapter explains the major model formats (SafeTensors, GGUF, ONNX), demystifies quantization techniques (GPTQ, AWQ, GGML/GGUF), provides guidance on choosing models for different use cases, and introduces the concept of a model registry for your control plane. We focus on the practical knowledge needed to make informed model selection decisions.}
+\abstract*{Understanding hardware is essential for making informed decisions about self-hosted inference. This chapter covers how transformers use memory during inference, VRAM calculation formulas, CPU vs GPU trade-offs, and a comprehensive comparison of available hardware options. We also analyze the economics of owned versus rented infrastructure to help you make the right choice for your situation.}
 
-\abstract{The choice of model format and quantization level directly impacts performance, quality, and resource requirements. This chapter explains the major model formats (SafeTensors, GGUF, ONNX), demystifies quantization techniques (GPTQ, AWQ, GGML/GGUF), provides guidance on choosing models for different use cases, and introduces the concept of a model registry for your control plane. We focus on the practical knowledge needed to make informed model selection decisions.}
+\abstract{Understanding hardware is essential for making informed decisions about self-hosted inference. This chapter covers how transformers use memory during inference, VRAM calculation formulas, CPU vs GPU trade-offs, and a comprehensive comparison of available hardware options. We also analyze the economics of owned versus rented infrastructure to help you make the right choice for your situation.}
 
-% =============================================================================
-\section{Understanding Model Formats}
-\label{sec:model-formats}
-% =============================================================================
-
-% TODO: Overview of formats and their purposes
-
-\subsection{SafeTensors}
-\label{subsec:safetensors}
-
-% TODO: The modern standard
-% - What it is
-% - Safety advantages over pickle
-% - Where it's used (HuggingFace standard)
-% - Loading and inspection
-
-\subsection{GGUF (GPT-Generated Unified Format)}
-\label{subsec:gguf}
-
-% TODO: The llama.cpp format
-% - History: GGML -> GGUF
-% - Single-file advantage
-% - Metadata embedding
-% - Quantization built-in
-% - Where to find GGUF models
-
-\subsection{ONNX (Open Neural Network Exchange)}
-\label{subsec:onnx}
-
-% TODO: Cross-platform format
-% - Purpose and advantages
-% - When to use
-% - Conversion considerations
-
-\subsection{Format Comparison}
-\label{subsec:format-comparison}
-
-% TODO: Comparison table
-% | Format | Use Case | Quantization | Ecosystem |
-% | SafeTensors | Training, HF | External | PyTorch, TF |
-% | GGUF | Inference | Built-in | llama.cpp |
-% | ONNX | Cross-platform | External | Multiple |
+% Note: Model/Transformer fundamentals are now covered in Chapter 2 (How LLMs Work)
 
 % =============================================================================
-\section{Quantization Fundamentals}
-\label{sec:quantization-fundamentals}
+\section{How Transformers Use Memory}
+\label{sec:transformer-memory}
 % =============================================================================
 
-% TODO: What quantization is and why it matters
+Before selecting hardware, you need to understand what consumes memory during inference. Three components dominate: model weights, the KV cache, and working memory for activations. Each scales differently with model size and usage patterns.
 
-\subsection{What is Quantization?}
-\label{subsec:what-is-quantization}
+\subsection{Model Weights}
+\label{subsec:model-weights}
 
-% TODO: Core concepts
-% - Reducing precision
-% - Memory savings
-% - Speed improvements
-% - Quality trade-offs
+Model weights are the learned parameters---the numbers that make a model behave intelligently. A "7B model" has approximately 7 billion parameters. Each parameter requires storage, and the memory needed depends on numerical precision.
 
-\subsection{Quantization Levels}
-\label{subsec:quantization-levels}
+The formula is straightforward:
 
-% TODO: Common quantization levels
-% - Q8 (8-bit)
-% - Q6 (6-bit)
-% - Q5 (5-bit)
-% - Q4 (4-bit) - sweet spot
-% - Q3/Q2 (aggressive)
+\begin{equation}
+\text{Weight Memory} = \text{Parameters} \times \text{Bytes per Parameter}
+\end{equation}
 
-\begin{svgraybox}
-\textbf{The Quantization Sweet Spot:}
+At full precision (FP32), each parameter uses 4 bytes. A 7B model requires $7 \times 10^9 \times 4 = 28$ GB just for
+weights---more than most consumer GPUs offer.  This is why serving large models at FP32 for inference is very rare.
 
-For most use cases, Q4 (4-bit) quantization provides the best balance:
+Half precision (FP16 or BF16) cuts this in half: 2 bytes per parameter, so 14 GB for a 7B model. This fits on a consumer
+grade GPU (like the RTX 4090 with 24 GB) with room to spare, but will limit any real usage when you account for other
+memory needs.
+
+Quantization reduces precision further. At 4-bit precision (INT4), each parameter uses only 0.5 bytes, bringing our 7B model down to 3.5 GB. This is why quantized models run on laptops and modest GPUs---the memory reduction is dramatic:
+
+\todo{Explain what precisions are and why it is needed - Quantization etc}
+
+\begin{table}[htbp]
+\centering
+\caption{Weight memory for common model sizes at different precisions.}
+\label{tab:weight-memory}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Model} & \textbf{FP32} & \textbf{FP16} & \textbf{INT8} & \textbf{INT4} \\
+\midrule
+7B   & 28 GB  & 14 GB  & 7 GB   & 3.5 GB \\
+13B  & 52 GB  & 26 GB  & 13 GB  & 6.5 GB \\
+30B  & 120 GB & 60 GB  & 30 GB  & 15 GB \\
+70B  & 280 GB & 140 GB & 70 GB  & 35 GB \\
+400B & 1.6 TB & 800 GB & 400 GB & 200 GB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+These numbers represent minimums---the weights alone, with nothing else. Actual VRAM usage is higher due to the KV cache and working memory we'll cover next.
+
+\subsection{The KV Cache}
+\label{subsec:kv-cache}
+
+The KV cache is the second major memory consumer, and unlike weights, it grows during inference. Understanding it explains why long conversations consume more memory than short ones.
+
+During autoregressive generation, the model generates one token at a time. For each new token, it must "attend" to all previous tokens---the attention mechanism needs to compute relationships between the new token and everything that came before. Without caching, this would require reprocessing the entire context for every generated token, making generation quadratically slower.
+
+The KV cache stores the key and value vectors computed during attention. Once computed, these don't change, so caching them avoids redundant computation. The trade-off: memory consumption that grows linearly with context length.
+
+\todo{Is there a dynamic programming relation here?}
+
+The KV cache size depends on model architecture:
+
+\begin{equation}
+\text{KV Cache} = 2 \times L \times H \times D \times C \times B \times N
+\end{equation}
+
+Where:
 \begin{itemize}
-\item 4x memory reduction vs FP16
-\item Minimal quality degradation (typically <3\%)
-\item Sufficient precision for most tasks
-\item Good inference speed
+\item $L$ = number of layers
+\item $H$ = number of attention heads (or KV heads for GQA)
+\item $D$ = dimension per head
+\item $C$ = context length (tokens)
+\item $B$ = bytes per value (2 for FP16)
+\item $N$ = batch size
+\item Factor of 2 accounts for both keys and values
 \end{itemize}
 
-Go lower (Q3/Q2) only when memory-constrained. Go higher (Q5/Q6) for quality-critical applications.
+For a typical 7B model (32 layers, 32 heads, 128 dimensions per head) at FP16:
+
+\begin{equation}
+\text{KV Cache} = 2 \times 32 \times 32 \times 128 \times C \times 2 = 524,288 \times C \text{ bytes}
+\end{equation}
+
+At 4096 context tokens: $\sim$2 GB. At 32K context: $\sim$16 GB. At 128K context: $\sim$64 GB---potentially exceeding the weight memory itself.
+
+This is why long-context inference is memory-intensive. A 7B model that fits comfortably in 8 GB VRAM at 4K context may require 24 GB at 32K context. Grouped Query Attention (GQA), used in newer models like Llama 3 and Qwen 2.5, reduces KV cache size by sharing key-value heads, typically by 4--8x.
+
+\todo{May be time to explain some of the architectures here - eg Long Context Inference, GQA etc - more importantly how
+it might affect how GPUs are used}
+
+\subsection{Activation and Working Memory}
+\label{subsec:activation-memory}
+
+Beyond weights and KV cache, inference requires working memory for intermediate computations. This includes attention scores, feed-forward network activations, and temporary buffers for matrix operations.
+
+For a single forward pass, activation memory scales with model dimensions and batch size:
+
+\begin{equation}
+\text{Activation Memory} \approx B \times C \times D_{\text{model}} \times L \times k
+\end{equation}
+
+Where $k$ is a small constant (typically 2--4) depending on the engine's memory management. For a 7B model with batch size 1 and 4K context, activations consume roughly 200--500 MB.
+
+This seems small compared to weights and KV cache, but it matters for two reasons. First, activation memory must be allocated contiguously, and memory fragmentation can prevent allocation even when total free memory appears sufficient. Second, during batched inference, activation memory grows linearly with batch size.
+
+\subsubsection*{The Overhead Budget}
+
+Practical VRAM planning requires a safety margin. CUDA maintains its own memory pools, the inference engine has overhead, and memory fragmentation accumulates over time. A conservative estimate adds 10--20\% to your calculated requirements:
+
+\begin{equation}
+\text{Total VRAM} \approx (\text{Weights} + \text{KV Cache} + \text{Activations}) \times 1.15
+\end{equation}
+
+If your calculations show 20 GB needed, plan for 23 GB to be safe. This matters when choosing between a 24 GB GPU that barely fits and a 48 GB GPU with comfortable headroom. The latter allows longer contexts, larger batches, or simply more reliable operation.
+
+% =============================================================================
+\section{VRAM Calculation}
+\label{sec:vram-calculation}
+% =============================================================================
+
+With the components understood, we can now calculate total VRAM requirements. This section provides formulas and worked examples for the model sizes we'll deploy throughout the book.
+
+\begin{svgraybox}
+\textbf{VRAM Estimation Formula:}
+
+For a model with $P$ parameters at precision $B$ bytes:
+
+\begin{equation}
+\text{VRAM}_{\text{base}} = P \times B
+\end{equation}
+
+For inference with context length $C$ and batch size $N$:
+
+\begin{equation}
+\text{VRAM}_{\text{total}} \approx P \times B + \text{KV\_cache}(C, N) + \text{overhead}
+\end{equation}
+
+Where overhead is typically 10--20\% additional memory.
 \end{svgraybox}
 
-% =============================================================================
-\section{Quantization Methods}
-\label{sec:quantization-methods}
-% =============================================================================
+\subsection{Precision and Memory}
+\label{subsec:precision}
 
-% TODO: Different quantization approaches
+Numerical precision determines bytes per parameter. Lower precision means smaller models but potentially reduced quality. The trade-off is usually worthwhile for inference.
 
-\subsection{GGUF Quantization (llama.cpp)}
-\label{subsec:gguf-quantization}
+\todo{Also talk about why this tradeoff is worthwhile and ways it might be compensated for}
 
-% TODO: GGUF quantization types
-% - Q4_K_M, Q4_K_S explained
-% - Q5_K_M, Q5_K_S
-% - What the K, M, S mean
-% - Choosing the right variant
+\begin{table}[htbp]
+\centering
+\caption{Numerical precision formats for inference.}
+\label{tab:precision-formats}
+\begin{tabular}{llll}
+\toprule
+\textbf{Format} & \textbf{Bytes} & \textbf{Use Case} & \textbf{Quality Impact} \\
+\midrule
+FP32  & 4   & Training, reference & Baseline \\
+FP16  & 2   & Standard GPU inference & Negligible \\
+BF16  & 2   & Standard GPU inference & Negligible \\
+INT8  & 1   & Quantized inference & Minor (1--2\%) \\
+INT4  & 0.5 & Aggressive quantization & Moderate (2--5\%) \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-\subsection{GPTQ}
-\label{subsec:gptq}
+FP16 and BF16 are functionally equivalent for inference---both use 2 bytes. BF16 has a larger exponent range (better for training stability), while FP16 has more mantissa precision. Most inference engines treat them interchangeably.
 
-% TODO: GPTQ quantization
-% - How it works (calibration-based)
-% - Advantages: accuracy preservation
-% - Disadvantages: requires GPU inference
-% - When to use
+INT8 quantization halves memory again with minimal quality loss. The model weights are stored as 8-bit integers with scaling factors that restore approximate floating-point values during computation. Well-implemented INT8 quantization typically degrades benchmark scores by 1--2\%.
 
-\subsection{AWQ (Activation-aware Weight Quantization)}
-\label{subsec:awq}
+INT4 (4-bit) is where things get interesting. Each parameter uses only half a byte, enabling 7B models to run in 4 GB VRAM. Quality degradation is noticeable but often acceptable---modern quantization methods like GGUF's Q4\_K\_M use mixed precision, keeping critical layers at higher precision while aggressively quantizing others. Chapter~\ref{ch:models} covers quantization methods in detail.
 
-% TODO: AWQ quantization
-% - How it differs from GPTQ
-% - Performance characteristics
-% - Ecosystem support
+\subsection{Worked Examples}
+\label{subsec:vram-examples}
 
-\subsection{BitsAndBytes}
-\label{subsec:bitsandbytes}
+Let's calculate VRAM requirements for the models we'll deploy in this book. These examples use the formulas from earlier sections with realistic assumptions.
 
-% TODO: HuggingFace integration
-% - 8-bit and 4-bit options
-% - nf4 quantization
-% - When to use
+\subsubsection*{7B Model (Part I)}
 
-\subsection{Method Comparison}
-\label{subsec:quant-method-comparison}
+For Qwen 2.5 7B at Q4\_K\_M quantization with 4096 context:
 
-% TODO: When to use each
-% | Method | Ecosystem | CPU Support | GPU Support | Quality |
-% | GGUF | llama.cpp | Yes | Yes | Good |
-% | GPTQ | HF/vLLM | No | Yes | Excellent |
-% | AWQ | vLLM | No | Yes | Excellent |
-% | BnB | HF | Limited | Yes | Good |
+\begin{itemize}
+\item Weights: $7 \times 10^9 \times 0.5 = 3.5$ GB
+\item KV Cache (with GQA): $\sim$0.5 GB at 4K context
+\item Overhead (15\%): $\sim$0.6 GB
+\item \textbf{Total: $\sim$4.6 GB}
+\end{itemize}
 
-% =============================================================================
-\section{Choosing Models for Your Use Case}
-\label{sec:choosing-models}
-% =============================================================================
+This fits comfortably on an 8 GB GPU (RTX 4060) or a MacBook with 8 GB unified memory. At FP16 without quantization, the same model requires $\sim$16 GB---still feasible on an RTX 4090 or M2 Pro.
 
-% TODO: Decision framework
+\subsubsection*{30B Model (Part II)}
 
-\subsection{Model Families Overview}
-\label{subsec:model-families}
+For a 30B model at Q4\_K\_M with 8192 context:
 
-% TODO: Current landscape
-% - Llama family (Meta)
-% - Mistral family
-% - Qwen family (Alibaba)
-% - Phi family (Microsoft)
-% - Gemma family (Google)
-% - Open-source vs open-weight
+\begin{itemize}
+\item Weights: $30 \times 10^9 \times 0.5 = 15$ GB
+\item KV Cache: $\sim$2 GB at 8K context
+\item Overhead (15\%): $\sim$2.5 GB
+\item \textbf{Total: $\sim$19.5 GB}
+\end{itemize}
 
-\subsection{Size vs Quality Trade-offs}
-\label{subsec:size-quality}
+This requires a 24 GB GPU (RTX 4090, RTX 3090) or an M2 Max with 32 GB. At FP16, you'd need $\sim$70 GB---beyond consumer hardware.
 
-% TODO: How to think about model size
-% - Benchmarks and their limitations
-% - Real-world testing importance
-% - Task-specific performance
+\subsubsection*{70B Model (Part III)}
 
-\subsection{Decision Matrix}
-\label{subsec:model-decision-matrix}
+For a 70B model at Q4\_K\_M with 8192 context:
 
-% TODO: Practical recommendations
-% | Task | Min Size | Recommended | Notes |
-% | Simple chat | 1B | 7B | TinyLlama, Phi-3 |
-% | Code generation | 7B | 13B-33B | CodeLlama, Qwen-Coder |
-% | Complex reasoning | 13B | 70B | Llama 3.1, Mistral |
-% | Production | 7B-13B | 30B | Balance quality/cost |
+\begin{itemize}
+\item Weights: $70 \times 10^9 \times 0.5 = 35$ GB
+\item KV Cache: $\sim$4 GB at 8K context
+\item Overhead (15\%): $\sim$6 GB
+\item \textbf{Total: $\sim$45 GB}
+\end{itemize}
 
-% =============================================================================
-\section{Where to Find Models}
-\label{sec:finding-models}
-% =============================================================================
+This exceeds any single consumer GPU. Options: dual RTX 4090s (48 GB total), A100 80GB, or an M2 Ultra with 64+ GB. At FP16, you'd need $\sim$160 GB---multiple A100s or H100s.
 
-% TODO: Model sources
+\subsubsection*{400B Model (Part IV)}
 
-\subsection{Hugging Face Hub}
-\label{subsec:huggingface-hub}
+For a 400B model at FP8 with 32K context:
 
-% TODO: The main repository
-% - Navigation
-% - Finding quantized versions
-% - Evaluating model cards
-% - TheBloke's quantizations
+\begin{itemize}
+\item Weights: $400 \times 10^9 \times 1 = 400$ GB
+\item KV Cache: $\sim$50 GB at 32K context
+\item Overhead (15\%): $\sim$67 GB
+\item \textbf{Total: $\sim$517 GB}
+\end{itemize}
 
-\subsection{Ollama Library}
-\label{subsec:ollama-library}
-
-% TODO: Ollama's curated collection
-% - Pre-configured models
-% - Version management
-% - Custom modelfiles
-
-\subsection{Model Evaluation}
-\label{subsec:model-evaluation}
-
-% TODO: How to evaluate models
-% - Benchmark scores (limitations)
-% - Your own test suite
-% - A/B testing
+This requires a cluster: 8x H100 80GB GPUs with NVLink provide 640 GB aggregate VRAM. This is the domain of data center deployments, covered in Part IV.
 
 % =============================================================================
-\section{Building a Model Registry}
-\label{sec:model-registry}
+\section{CPU vs GPU Inference}
+\label{sec:cpu-vs-gpu}
 % =============================================================================
 
-% TODO: Introduce the concept for control plane
+GPUs dominate inference discussions, but CPUs remain viable for certain workloads. Understanding when each makes sense helps you choose appropriate hardware---and avoid overspending.
 
-\subsection{Why a Registry?}
-\label{subsec:why-registry}
+\subsection{CPU Inference}
+\label{subsec:cpu-inference}
 
-% TODO: Benefits
-% - Centralized metadata
-% - Version tracking
-% - Capability mapping
-% - Cost tracking
+CPUs have one major advantage: memory capacity. A workstation with 128 GB RAM costs far less than a GPU with 128 GB VRAM (which doesn't exist in consumer hardware). If your model fits in RAM, CPU inference works.
 
-\subsection{Registry Data Model}
-\label{subsec:registry-data-model}
+The trade-off is speed. CPUs lack the massive parallelism of GPUs. A modern CPU has 8--24 cores; an RTX 4090 has 16,384 CUDA cores. Transformer inference involves large matrix multiplications that parallelize well---GPUs complete them 10--50x faster than CPUs.
 
-\begin{programcode}{Model Registry Interface (Go)}
-\begin{lstlisting}[language=Go]
-// ModelInfo represents metadata about a model
-type ModelInfo struct {
-    ID            string            `json:"id"`
-    Name          string            `json:"name"`
-    Family        string            `json:"family"`
-    Parameters    string            `json:"parameters"` // e.g., "7B"
-    Quantization  string            `json:"quantization"` // e.g., "Q4_K_M"
-    Format        string            `json:"format"` // gguf, safetensors
-    VRAMRequired  int64             `json:"vram_required_mb"`
-    ContextWindow int               `json:"context_window"`
-    Capabilities  []string          `json:"capabilities"`
-    CostPerToken  float64           `json:"cost_per_token"`
-    Metadata      map[string]string `json:"metadata"`
-}
+llama.cpp has made CPU inference surprisingly practical through careful optimization:
 
-// ModelRegistry manages available models
-type ModelRegistry interface {
-    List(ctx context.Context) ([]ModelInfo, error)
-    Get(ctx context.Context, modelID string) (ModelInfo, error)
-    Register(ctx context.Context, model ModelInfo) error
-    FindByCapability(ctx context.Context, cap string) ([]ModelInfo, error)
-}
-\end{lstlisting}
-\end{programcode}
+\begin{itemize}
+\item \textbf{SIMD instructions}: Uses AVX2/AVX-512 for vectorized operations
+\item \textbf{Quantization}: INT4 models reduce memory bandwidth requirements
+\item \textbf{Cache optimization}: Arranges computations to maximize L1/L2 cache hits
+\item \textbf{Multi-threading}: Distributes work across all available cores
+\end{itemize}
+
+With these optimizations, a 7B Q4 model achieves 5--15 tokens/second on a modern CPU (AMD Ryzen 9, Intel i9). Slow for interactive chat, but acceptable for batch processing or situations where latency tolerance is high.
+
+CPU inference makes sense when:
+\begin{itemize}
+\item You need more memory than any affordable GPU provides
+\item Throughput requirements are modest (batch jobs, offline processing)
+\item You're experimenting before investing in GPU hardware
+\item The deployment environment lacks GPU support
+\end{itemize}
+
+\subsection{GPU Inference}
+\label{subsec:gpu-inference}
+
+GPUs excel at inference for three reasons: parallelism, memory bandwidth, and specialized hardware.
+
+\textbf{Parallelism}: Transformer layers consist of matrix multiplications and element-wise operations. A GPU executes thousands of these operations simultaneously. What takes a CPU 100ms takes a GPU 2ms.
+
+\textbf{Memory bandwidth}: An RTX 4090 provides 1 TB/s memory bandwidth; high-end CPUs offer 50--100 GB/s. Since inference is often memory-bound (loading weights from memory dominates compute time), this 10--20x bandwidth advantage translates directly to speed.
+
+\textbf{Tensor cores}: NVIDIA GPUs include specialized units for matrix operations. Tensor cores perform mixed-precision matrix multiplications in hardware, accelerating the exact operations transformers need. An H100's tensor cores deliver 4 petaflops of FP8 performance.
+
+GPU inference is required when:
+\begin{itemize}
+\item Interactive latency matters (chat, code completion, real-time applications)
+\item Throughput requirements are high (serving many concurrent users)
+\item You're running larger models (30B+) where CPU speed becomes impractical
+\item You need consistent, predictable performance
+\end{itemize}
+
+\subsection{Hybrid Approaches}
+\label{subsec:hybrid-cpu-gpu}
+
+When a model doesn't quite fit in VRAM, hybrid CPU-GPU inference offers a middle ground. The model splits across both: some layers run on GPU, others on CPU.
+
+llama.cpp supports this via the \texttt{-ngl} (number of GPU layers) parameter. A 70B model has roughly 80 layers. With 24 GB VRAM, you might offload 40 layers to GPU and keep 40 on CPU. The GPU-resident layers run fast; CPU layers run slower; overall speed falls somewhere between pure-CPU and pure-GPU.
+
+The trade-off is predictable: more GPU layers means faster inference, but requires more VRAM. Practical tuning involves:
+
+\begin{enumerate}
+\item Start with all layers on CPU (\texttt{-ngl 0})
+\item Increase GPU layers until VRAM is nearly full
+\item Benchmark to find the sweet spot
+\end{enumerate}
+
+Hybrid inference makes economic sense when:
+\begin{itemize}
+\item Your model slightly exceeds GPU memory
+\item Buying a larger GPU isn't cost-effective
+\item You accept 2--5x slower inference versus pure-GPU
+\end{itemize}
+
+For production workloads, pure-GPU (possibly multi-GPU) is usually preferable. Hybrid inference introduces complexity and variable performance. But for development, experimentation, or cost-sensitive deployments, it extends what's possible with limited hardware.
+
+% =============================================================================
+\section{GPU Hardware Comparison}
+\label{sec:gpu-comparison}
+% =============================================================================
+
+This section surveys available GPU options across price points. Prices fluctuate; treat these as approximate guidance for relative comparisons.
+
+\subsection{NVIDIA Consumer GPUs}
+\label{subsec:nvidia-consumer}
+
+NVIDIA's GeForce RTX series offers the best price-to-performance for inference. The key specs are VRAM capacity and memory bandwidth.
+
+\begin{table}[htbp]
+\centering
+\caption{NVIDIA consumer GPUs for inference (2025 pricing).}
+\label{tab:nvidia-consumer}
+\begin{tabular}{lrrrl}
+\toprule
+\textbf{GPU} & \textbf{VRAM} & \textbf{BW} & \textbf{Price} & \textbf{Best For} \\
+\midrule
+RTX 3060      & 12 GB & 360 GB/s  & \$250  & Budget 7B \\
+RTX 3090      & 24 GB & 936 GB/s  & \$700  & Used market \\
+RTX 4060      & 8 GB  & 272 GB/s  & \$300  & Entry 7B Q4 \\
+RTX 4070 Ti S & 16 GB & 672 GB/s  & \$800  & 7B--13B \\
+RTX 4090      & 24 GB & 1008 GB/s & \$1600 & Up to 30B Q4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The RTX 4090 is the consumer inference king: 24 GB VRAM handles 30B quantized models, and 1 TB/s bandwidth delivers 80--100 tok/s on 7B models. The RTX 3090 offers the same VRAM at lower bandwidth---a compelling used-market option.
+
+\subsection{NVIDIA Professional GPUs}
+\label{subsec:nvidia-professional}
+
+Professional and datacenter GPUs offer more VRAM and features (ECC memory, multi-GPU scaling), at significantly higher prices~\cite{nvidia2024h100, nvidia2024a100}.
+
+\begin{table}[htbp]
+\centering
+\caption{NVIDIA professional and datacenter GPUs.}
+\label{tab:nvidia-professional}
+\begin{tabular}{lrrrl}
+\toprule
+\textbf{GPU} & \textbf{VRAM} & \textbf{BW} & \textbf{Price} & \textbf{Best For} \\
+\midrule
+RTX A6000   & 48 GB & 768 GB/s  & \$4500  & 30B--70B single \\
+A100 80GB   & 80 GB & 2039 GB/s & \$15000 & Production 70B \\
+H100 80GB   & 80 GB & 3350 GB/s & \$30000 & 70B--400B \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The H100's 3.35 TB/s bandwidth enables 200+ tok/s on 7B models. For 70B models, an H100 80GB runs the full model in VRAM; consumer GPUs require multi-GPU setups.
+
+\subsection{AMD GPUs}
+\label{subsec:amd-gpus}
+
+AMD offers competitive hardware, but software support lags NVIDIA. ROCm (AMD's CUDA equivalent) works with major frameworks, though compatibility issues persist~\cite{amd2024mi300}.
+
+The RX 7900 XTX (24 GB, \$900) matches RTX 4090 specs at lower price, but llama.cpp ROCm support is less mature. The MI300X (192 GB HBM3) is AMD's datacenter flagship---enough for 70B FP16 on a single card. If you're comfortable troubleshooting, AMD offers value; for production reliability, NVIDIA remains safer.
+
+\subsection{Apple Silicon}
+\label{subsec:apple-silicon}
+
+Apple's M-series chips use unified memory shared between CPU and GPU. A MacBook with 32 GB RAM provides 32 GB for model weights---no separate VRAM limitation~\cite{apple2024m4}.
+
+\begin{table}[htbp]
+\centering
+\caption{Apple Silicon for inference.}
+\label{tab:apple-silicon}
+\begin{tabular}{lrrl}
+\toprule
+\textbf{Chip} & \textbf{Max Memory} & \textbf{BW} & \textbf{Best For} \\
+\midrule
+M1/M2/M3 Pro   & 32 GB     & 200 GB/s  & 7B--13B dev \\
+M1/M2/M3 Max   & 64--128 GB & 400 GB/s  & 30B dev \\
+M2 Ultra       & 192 GB    & 800 GB/s  & Up to 70B Q4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Memory bandwidth is lower than discrete GPUs, so tokens/second is modest (20--40 tok/s for 7B). But unified memory means no CPU-GPU transfers, and the design is power-efficient and silent. Apple Silicon excels for development and on-the-go inference.
+
+\subsection{Hardware Recommendation Matrix}
+\label{subsec:hardware-matrix}
+
+Based on the VRAM calculations from Section~\ref{sec:vram-calculation}:
+
+\begin{table}[htbp]
+\centering
+\caption{Hardware recommendations by model size.}
+\label{tab:hardware-recommendations}
+\begin{tabular}{llll}
+\toprule
+\textbf{Model} & \textbf{Min VRAM} & \textbf{Recommended} & \textbf{Budget} \\
+\midrule
+7B Q4     & 4 GB   & RTX 4060 8GB     & M1 Mac 16GB \\
+7B FP16   & 16 GB  & RTX 4090 24GB    & RTX 3090 24GB \\
+30B Q4    & 18 GB  & RTX 4090 24GB    & M2 Max 64GB \\
+70B Q4    & 40 GB  & 2x RTX 4090      & M2 Ultra 192GB \\
+400B FP8  & 500 GB & 8x H100 80GB     & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+For most readers, an RTX 4060 or M-series MacBook runs all Part I examples. Part II's 30B models need an RTX 4090 or equivalent. Parts III and IV require multi-GPU or datacenter hardware.
+
+% =============================================================================
+\section{Owned vs Rented Infrastructure}
+\label{sec:owned-vs-rented}
+% =============================================================================
+
+The decision between owning and renting GPU infrastructure is primarily economic, but it also affects operational complexity, scalability, and flexibility. This section provides a framework for making this decision based on your specific usage patterns.
+
+\subsection{Buying Hardware}
+\label{subsec:buying-hardware}
+
+Owning hardware means paying upfront capital expenditure (CapEx) in exchange for lower marginal costs per inference. The total cost of ownership includes:
+
+\begin{description}
+\item[Purchase Price] The obvious cost---ranging from \$300 for an RTX 4060 to \$30,000+ for an H100.
+
+\item[Power Consumption] GPUs under load consume significant power. An RTX 4090 draws 450W at peak; an H100 draws 700W. At \$0.15/kWh running 24/7, that's \$50--90/month per GPU.
+
+\item[Cooling] Heat must go somewhere. Consumer cards in a well-ventilated case are manageable. Datacenter GPUs require industrial cooling---either air conditioning or liquid cooling systems.
+
+\item[Maintenance] Hardware fails. Budget for replacement fans, thermal paste reapplication, and occasional component failures. Enterprise environments need redundancy.
+
+\item[Depreciation] GPU values decline 30--50\% annually. An RTX 4090 bought today will be worth \$800--1000 in two years when the RTX 5090 releases.
+\end{description}
+
+\begin{svgraybox}
+\textbf{Tax Implications:}
+
+In many jurisdictions, business hardware purchases are tax-deductible. US businesses can often depreciate hardware over 5 years or take advantage of Section 179 deductions for immediate expensing. Consult a tax professional---the effective cost reduction can be 20--40\% for qualifying businesses.
+\end{svgraybox}
+
+Ownership makes sense when:
+\begin{itemize}
+\item You have consistent, predictable GPU utilization above 50\%
+\item You need low latency that colocated hardware provides
+\item You're in a location with cheap electricity
+\item Data sovereignty requirements prevent cloud usage
+\item You have the technical capability to manage hardware
+\end{itemize}
+
+\subsection{Renting Cloud GPUs}
+\label{subsec:renting-gpus}
+
+Cloud GPU rental converts capital expenditure into operational expenditure (OpEx)---you pay only for what you use, with no upfront costs. The market has several tiers:
+
+\paragraph{Spot/Marketplace Providers}
+These aggregate spare GPU capacity at the lowest prices:
+
+\begin{table}[htbp]
+\centering
+\caption{GPU rental pricing comparison (prices as of 2024, subject to change).}
+\label{tab:gpu-rental-pricing}
+\begin{tabular}{lllr}
+\toprule
+\textbf{Provider} & \textbf{GPU} & \textbf{Type} & \textbf{\$/hour} \\
+\midrule
+Vast.ai     & RTX 4090   & Community   & 0.30--0.50 \\
+RunPod      & RTX 4090   & Secure Cloud & 0.44 \\
+RunPod      & A100 80GB  & Secure Cloud & 1.99 \\
+Lambda Labs & A100 80GB  & On-demand   & 1.99 \\
+Lambda Labs & H100 80GB  & On-demand   & 2.49 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Major Cloud Providers}
+AWS, GCP, and Azure offer enterprise-grade GPU instances with higher reliability but premium pricing:
+
+\begin{table}[htbp]
+\centering
+\caption{Major cloud provider GPU pricing (on-demand, US regions).}
+\label{tab:cloud-gpu-pricing}
+\begin{tabular}{lllr}
+\toprule
+\textbf{Provider} & \textbf{Instance} & \textbf{GPU} & \textbf{\$/hour} \\
+\midrule
+AWS         & g5.xlarge     & A10G 24GB    & 1.01 \\
+AWS         & p4d.24xlarge  & 8x A100 40GB & 32.77 \\
+GCP         & a2-highgpu-1g & A100 40GB    & 3.67 \\
+Azure       & NC24ads A100  & A100 80GB    & 3.67 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Major cloud providers cost 2--5x more than marketplace providers, but offer:
+\begin{itemize}
+\item Enterprise SLAs and support
+\item Integration with existing cloud infrastructure
+\item Reserved capacity and spot pricing options
+\item Compliance certifications (SOC 2, HIPAA, etc.)
+\end{itemize}
+
+\begin{warning}{Spot Instance Interruption}
+Spot instances on major clouds (AWS Spot, GCP Preemptible) can be terminated with 30 seconds notice. This is acceptable for batch processing but problematic for real-time inference. Design your architecture with graceful degradation if using spot instances.
+\end{warning}
+
+\subsection{Break-Even Analysis}
+\label{subsec:break-even}
+
+The break-even point determines when owning hardware becomes cheaper than renting. The calculation depends critically on your utilization rate---how many hours per month you actually use the GPU.
+
+\begin{svgraybox}
+\textbf{Break-Even Formula:}
+
+\begin{equation}
+\text{Break-even (months)} = \frac{\text{Hardware Cost} + \text{Setup Costs}}{\text{Monthly Rental Cost} - \text{Monthly Operating Cost}}
+\end{equation}
+
+Where Monthly Operating Cost includes power, cooling, and amortized maintenance.
+\end{svgraybox}
+
+\paragraph{Worked Example: RTX 4090 for 24/7 Inference}
+
+Let's compare buying an RTX 4090 versus renting on RunPod for continuous operation:
+
+\textbf{Buy scenario:}
+\begin{itemize}
+\item Hardware cost: \$1,600 (RTX 4090) + \$800 (system) = \$2,400
+\item Monthly power: 300W average $\times$ 720 hours $\times$ \$0.15/kWh = \$32
+\item Monthly cooling/maintenance: \$10 (home lab estimate)
+\item Monthly OpEx: \$42
+\end{itemize}
+
+\textbf{Rent scenario:}
+\begin{itemize}
+\item RunPod RTX 4090: \$0.44/hour $\times$ 720 hours = \$317/month
+\end{itemize}
+
+\textbf{Break-even calculation:}
+\begin{equation}
+\text{Break-even} = \frac{\$2,400}{\$317 - \$42} = \frac{\$2,400}{\$275} = 8.7 \text{ months}
+\end{equation}
+
+For 24/7 operation, buying pays for itself in under 9 months. After that, you save \$275/month.
+
+\paragraph{The Utilization Factor}
+
+The calculation changes dramatically at lower utilization:
+
+\begin{table}[htbp]
+\centering
+\caption{Break-even months by GPU utilization (RTX 4090).}
+\label{tab:break-even-utilization}
+\begin{tabular}{rrrrr}
+\toprule
+\textbf{Utilization} & \textbf{Hours/Month} & \textbf{Rent Cost} & \textbf{Own Cost} & \textbf{Break-even} \\
+\midrule
+100\% & 720 & \$317 & \$42 & 8.7 months \\
+75\%  & 540 & \$238 & \$35 & 11.8 months \\
+50\%  & 360 & \$158 & \$28 & 18.5 months \\
+25\%  & 180 & \$79  & \$21 & 41.4 months \\
+10\%  & 72  & \$32  & \$17 & 160 months \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+At 10\% utilization, break-even takes over 13 years---well past the hardware's useful life. The rule of thumb: \textbf{if utilization is below 30\%, rent; above 50\%, buy; between 30--50\%, consider other factors.}
+
+\subsection{Hybrid Strategies}
+\label{subsec:hybrid-strategies}
+
+Many organizations benefit from a hybrid approach: own base capacity and rent for peaks.
+
+\paragraph{Own the Floor, Rent the Ceiling}
+
+Analyze your traffic patterns. If you have consistent baseline traffic with periodic spikes (product launches, marketing campaigns, seasonal patterns), own hardware to handle the baseline and burst to cloud for peaks.
+
+Example architecture:
+\begin{itemize}
+\item \textbf{Baseline}: 2x RTX 4090 owned, handles 90th percentile of daily traffic
+\item \textbf{Burst}: Auto-scale to RunPod/Lambda when queue depth exceeds threshold
+\item \textbf{Cost}: Own infrastructure cost + cloud cost only during spikes
+\end{itemize}
+
+This approach captures most of the ownership savings while maintaining elasticity.
+
+\paragraph{Geographic Distribution}
+
+Another hybrid strategy distributes inference geographically:
+\begin{itemize}
+\item Own hardware in your primary region for low latency
+\item Use cloud instances in other regions to serve global users
+\item Route requests based on user location and current load
+\end{itemize}
+
+\paragraph{Development vs Production}
+
+A common pattern separates environments:
+\begin{itemize}
+\item \textbf{Development}: Local GPU (even consumer-grade) for rapid iteration
+\item \textbf{Staging}: Spot instances for cost-effective testing
+\item \textbf{Production}: Owned hardware or reserved instances for predictable costs
+\end{itemize}
+
+This gives developers fast feedback loops while optimizing production costs.
+
+% =============================================================================
+\section{Power and Cooling Considerations}
+\label{sec:power-cooling}
+% =============================================================================
+
+If you're running inference on owned hardware, power and cooling become practical concerns that directly affect costs and reliability.
+
+\subsection{Power Consumption}
+\label{subsec:power-consumption}
+
+GPU power consumption varies by model and workload. Inference typically uses less power than training, but sustained inference still generates significant heat.
+
+\begin{table}[htbp]
+\centering
+\caption{GPU power consumption under inference load.}
+\label{tab:gpu-power}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{GPU} & \textbf{TDP (W)} & \textbf{Inference (W)} & \textbf{Monthly Cost*} \\
+\midrule
+RTX 4060      & 115  & 80--100   & \$8--11 \\
+RTX 4070 Ti   & 285  & 180--220  & \$20--24 \\
+RTX 4090      & 450  & 280--350  & \$30--38 \\
+RTX 3090      & 350  & 250--300  & \$27--32 \\
+A100 40GB     & 400  & 300--350  & \$32--38 \\
+H100 80GB     & 700  & 500--600  & \$54--65 \\
+\bottomrule
+\multicolumn{4}{l}{\small *24/7 operation at \$0.15/kWh}
+\end{tabular}
+\end{table}
+
+\begin{svgraybox}
+\textbf{Power Calculation Formula:}
+
+\begin{equation}
+\text{Monthly cost} = \text{Watts} \times 24 \times 30 \times \frac{\text{Rate per kWh}}{1000}
+\end{equation}
+
+Example: 300W $\times$ 720 hours $\times$ \$0.15/1000 = \$32.40/month
+\end{svgraybox}
+
+Don't forget system overhead---CPU, RAM, storage, and power supply inefficiency add 100--200W to the GPU's consumption. A system with an RTX 4090 typically draws 500--600W total from the wall.
+
+\subsection{Cooling Requirements}
+\label{subsec:cooling-requirements}
+
+Every watt of power consumed becomes heat that must be removed. Cooling strategies depend on scale:
+
+\paragraph{Single GPU (Home/Office)}
+Consumer GPUs with adequate case airflow handle themselves:
+\begin{itemize}
+\item Two intake fans (front), one exhaust fan (rear), one top exhaust
+\item Ambient temperature below 25°C (77°F)
+\item GPU temperatures should stay below 80°C under sustained load
+\item Consider a vertical GPU mount for better airflow
+\end{itemize}
+
+\paragraph{Multi-GPU Workstation (2--4 GPUs)}
+Multiple GPUs in close proximity require more planning:
+\begin{itemize}
+\item Ensure PCIe slot spacing allows airflow between cards
+\item Blower-style coolers exhaust heat out of the case; axial coolers recirculate
+\item Consider water cooling for the top cards
+\item Monitor temperatures---throttling starts at 83°C on most NVIDIA cards
+\end{itemize}
+
+\paragraph{Server Room / Data Center}
+Rack-mounted GPU servers have professional cooling requirements:
+\begin{itemize}
+\item Each kilowatt of computing requires 0.3--0.5 kW of cooling
+\item Hot aisle / cold aisle containment improves efficiency
+\item Liquid cooling increasingly common for H100 deployments
+\item PUE (Power Usage Effectiveness) of 1.2--1.5 is typical
+\end{itemize}
+
+\begin{warning}{Thermal Throttling}
+GPUs automatically reduce clock speeds when temperatures exceed safe limits. An RTX 4090 at 83°C runs 10--15\% slower than one at 70°C. Poor cooling doesn't just waste power---it directly reduces throughput.
+\end{warning}
+
+\subsection{Home Lab Considerations}
+\label{subsec:home-lab}
+
+Running inference hardware at home is feasible but requires planning:
+
+\begin{description}
+\item[Electrical Circuits] A single 15A/120V circuit provides 1800W. One high-end system is fine; multiple systems need dedicated circuits or 240V installation.
+
+\item[Noise] GPU fans under load produce 40--50 dB---noticeable in a quiet room. Consider locating hardware in a closet, basement, or garage with adequate ventilation.
+
+\item[Heat Output] A 600W system adds 2000 BTU/hour to your space. In winter, this is free heating. In summer, your AC works harder. Budget for increased cooling costs.
+
+\item[Internet Connectivity] If serving external requests, ensure adequate upload bandwidth and consider your ISP's terms of service regarding servers.
+\end{description}
+
+\begin{important}{Fire Safety}
+High-power electronics generate real fire risk. Use quality power supplies with proper ratings. Don't overload circuits. Keep combustibles away from hardware. Have a fire extinguisher rated for electrical fires nearby.
+\end{important}
+
+% =============================================================================
+\section{TPU as an Alternative}
+\label{sec:tpu-sidebar}
+% =============================================================================
+
+\begin{backgroundinformation}{Google Cloud TPUs}
+While this book primarily focuses on GPU-based inference, Google Cloud TPUs offer an alternative worth considering. TPUs can be 50--70\% cheaper than equivalent GPUs for sustained workloads, but require JAX-based models and are only available on Google Cloud Platform.
+
+If you're deploying on GCP with JAX models, see Appendix~\ref{ch:appendix-tpu} for complete coverage of TPU inference.
+\end{backgroundinformation}
 
 % =============================================================================
 \section{Summary}
-\label{sec:ch03-summary}
+\label{sec:ch02-summary}
 % =============================================================================
+
+This chapter established the hardware foundations for self-hosted inference. We began with transformer memory architecture---understanding that model weights, KV cache, and activation memory compete for finite GPU resources. The VRAM calculation framework lets you predict memory requirements for any model before attempting to run it.
+
+We explored the CPU vs GPU trade-off, finding that GPU inference offers 10--50x speedups but requires careful memory planning. Hybrid approaches that offload some layers to CPU can bridge the gap when VRAM is insufficient for full GPU inference.
+
+The hardware comparison revealed that consumer GPUs (RTX 4090) offer exceptional value for smaller models, while datacenter hardware (A100, H100) becomes necessary at scale. Apple Silicon provides a unique option with its unified memory architecture, though with lower throughput than dedicated GPUs.
+
+Finally, we tackled the economics: buy vs rent depends primarily on utilization. Above 50\% utilization, owning hardware typically pays off within a year. Below 30\%, renting remains more cost-effective. Power and cooling add 10--15\% to operating costs and deserve consideration in any deployment.
+
+With this hardware foundation, Chapter~\ref{ch:inference-engines} introduces the software that puts this hardware to work: inference engines like llama.cpp, vLLM, and TensorRT-LLM.
 
 \begin{important}{Key Takeaways}
 \begin{itemize}
-\item GGUF is the format of choice for flexible inference (CPU + GPU support)
-\item Q4 quantization provides the best quality/memory trade-off for most cases
-\item GPTQ/AWQ offer superior quality but require GPU-only inference
-\item Model choice depends on task complexity, resource constraints, and quality needs
-\item A model registry helps manage the growing ecosystem of options
+\item VRAM is the primary constraint for GPU inference
+\item Quantization dramatically reduces memory requirements (4x for INT4)
+\item CPU inference is viable for smaller models with enough RAM
+\item Hardware choice depends on model size, budget, and utilization
+\item Break-even between owned and rented depends on consistent usage
 \end{itemize}
 \end{important}
 
@@ -280,21 +756,21 @@ type ModelRegistry interface {
 % =============================================================================
 
 \begin{prob}
-\label{prob:ch03-quantization-comparison}
-\textbf{Quantization Quality Comparison}\\
-Download the same base model in Q4, Q5, and Q8 quantization. Using a consistent set of 20 prompts (10 factual, 10 creative), evaluate the output quality. Document your methodology and findings.
+\label{prob:ch02-vram-calc}
+\textbf{VRAM Calculation}\\
+Calculate the minimum VRAM required to run a 30B parameter model at FP16 precision with a context length of 4096 tokens. Then calculate the VRAM needed if quantized to INT4.
 \end{prob}
 
 \begin{prob}
-\label{prob:ch03-model-selection}
-\textbf{Model Selection for Use Case}\\
-You're building a customer support chatbot that needs to handle billing questions, technical troubleshooting, and appointment scheduling. You have 16GB VRAM available. Research and recommend a specific model, justifying your choice.
+\label{prob:ch02-break-even}
+\textbf{Break-Even Analysis}\\
+You need to serve a 7B model 24/7. Calculate the break-even point (in months) between buying an RTX 4070 Ti (\$800) versus renting an equivalent GPU on RunPod (\$0.30/hour). Assume \$0.15/kWh electricity and 200W GPU power consumption.
 \end{prob}
 
 \begin{prob}
-\label{prob:ch03-registry-implementation}
-\textbf{Model Registry Implementation}\\
-Implement the \texttt{ModelRegistry} interface using a JSON file as the backing store. Include methods for adding models, listing by capability, and finding the best model for a given VRAM constraint.
+\label{prob:ch02-hardware-selection}
+\textbf{Hardware Selection}\\
+A startup needs to serve 1000 requests/hour with a 7B model. They have a budget of \$5,000. Recommend a hardware configuration and justify your choice, considering both owned and rented options.
 \end{prob}
 
 \input{chapters/references03}

@@ -1,102 +1,122 @@
-%%%%%%%%%%%%%%%%%%%%% chapter15.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%% chapter14.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% Chapter 15: 70B Deployment
+% Chapter 14: Model Routing and Selection
 %
 %%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{70B Model Deployment}
-\label{ch:70b-deployment}
+\chapter{Model Routing and Selection}
+\label{ch:routing}
 
-\abstract*{This chapter synthesizes everything from Part III into a complete 70B deployment. We cover the full setup with multi-GPU inference, tenant management, billing integration, and production monitoring. By the end, you'll have Control Plane v0.3---a multi-tenant AI platform serving enterprise customers.}
+\abstract*{Not every request needs your largest model. This chapter covers intelligent model routing based on request complexity, cost optimization through model selection, A/B testing different models, and building a routing engine that balances quality and cost. Smart routing can reduce costs by 50\% while maintaining quality.}
 
-\abstract{This chapter synthesizes everything from Part III into a complete 70B deployment. We cover the full setup with multi-GPU inference, tenant management, billing integration, and production monitoring. By the end, you'll have Control Plane v0.3---a multi-tenant AI platform serving enterprise customers.}
-
-% =============================================================================
-\section{Deployment Architecture}
-\label{sec:70b-architecture}
-% =============================================================================
-
-% TODO: Full architecture diagram
-% - Multiple inference nodes
-% - Control plane cluster
-% - Database
-% - Monitoring
+\abstract{Not every request needs your largest model. This chapter covers intelligent model routing based on request complexity, cost optimization through model selection, A/B testing different models, and building a routing engine that balances quality and cost. Smart routing can reduce costs by 50\% while maintaining quality.}
 
 % =============================================================================
-\section{Infrastructure Setup}
-\label{sec:infra-setup}
+\section{Why Route Between Models?}
+\label{sec:why-routing}
 % =============================================================================
 
-% TODO: Setting up the infrastructure
-% - GPU nodes
-% - Kubernetes or Docker Swarm
-% - Networking
+% TODO: Motivation
+% - Cost optimization
+% - Latency requirements
+% - Quality matching
 
 % =============================================================================
-\section{Control Plane v0.3 Configuration}
-\label{sec:cpv03-config}
+\section{Routing Strategies}
+\label{sec:routing-strategies}
 % =============================================================================
 
-% TODO: Complete configuration
-% - All features enabled
-% - Production tuning
+\subsection{Rule-Based Routing}
+\label{subsec:rule-routing}
+
+% TODO: Simple rules
+% - Task type -> model
+% - Token length -> model
+
+\subsection{Complexity-Based Routing}
+\label{subsec:complexity-routing}
+
+% TODO: Estimating complexity
+% - Prompt analysis
+% - User tier
+
+\subsection{Cost-Aware Routing}
+\label{subsec:cost-routing}
+
+% TODO: Cheapest model that works
 
 % =============================================================================
-\section{Deployment Checklist}
-\label{sec:deployment-checklist}
+\section{Router Implementation}
+\label{sec:router-impl}
 % =============================================================================
 
-% TODO: Pre-launch checklist
-% - Security
-% - Monitoring
-% - Backup
-% - Documentation
+\begin{programcode}{Model Router}
+\begin{lstlisting}[language=Go]
+// internal/router/router.go
+
+type ModelRouter interface {
+    SelectModel(ctx context.Context, req RoutingRequest) (string, error)
+}
+
+type RoutingRequest struct {
+    Prompt     string
+    MaxTokens  int
+    UserTier   string
+    TaskType   string
+    LatencySLA time.Duration
+}
+
+type RuleBasedRouter struct {
+    rules []RoutingRule
+}
+
+type RoutingRule struct {
+    Condition func(RoutingRequest) bool
+    Model     string
+    Priority  int
+}
+\end{lstlisting}
+\end{programcode}
 
 % =============================================================================
-\section{Operations Runbook}
-\label{sec:runbook}
+\section{A/B Testing Models}
+\label{sec:ab-testing}
 % =============================================================================
 
-% TODO: Day-to-day operations
-% - Scaling
-% - Updates
-% - Incident response
+% TODO: Testing model performance
+% - Traffic splitting
+% - Metrics collection
+% - Statistical analysis
+
+% =============================================================================
+\section{Fallback Strategies}
+\label{sec:fallback}
+% =============================================================================
+
+% TODO: When primary model fails
+% - Automatic failover
+% - Quality degradation
 
 % =============================================================================
 \section{Summary}
-\label{sec:ch15-summary}
+\label{sec:ch14-summary}
 % =============================================================================
 
 \begin{important}{Key Takeaways}
 \begin{itemize}
-\item 70B deployment requires careful planning
-\item Multi-GPU coordination is handled by vLLM
-\item Control Plane v0.3 provides full multi-tenancy
-\item Operational procedures are essential
+\item Smart routing can reduce costs by 30-50\%
+\item Match model capability to request complexity
+\item A/B testing validates routing decisions
+\item Always have fallback models
 \end{itemize}
 \end{important}
-
-\begin{svgraybox}
-\textbf{Part III Complete!}
-
-You now have Control Plane v0.3, a multi-tenant AI platform with:
-\begin{itemize}
-\item Tenant isolation and management
-\item Usage tracking and billing
-\item Multi-GPU distributed inference
-\item Intelligent model routing
-\item Production deployment patterns
-\end{itemize}
-
-In Part IV, we'll push to 400B models and build CodeLab, a commercial coding assistant.
-\end{svgraybox}
 
 \section*{Problems}
 \addcontentsline{toc}{section}{Problems}
 
 \begin{prob}
-\label{prob:ch15-deployment}
-Deploy a complete 70B inference stack with at least 3 tenants. Document the process and measure end-to-end latency.
+\label{prob:ch14-router}
+Implement a model router that selects between 7B, 30B, and 70B models based on prompt length, user tier, and task type.
 \end{prob}
 
-\input{chapters/references15}
+\input{chapters/references14}
