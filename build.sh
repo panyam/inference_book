@@ -95,6 +95,9 @@ build_chapter() {
 \usepackage{hyperref}
 \usepackage{booktabs}
 \usepackage{longtable}
+\usepackage{amsmath}
+\usepackage{tikz}
+\usetikzlibrary{positioning}
 
 % Code listing style for Go
 \lstdefinelanguage{Go}{
@@ -224,6 +227,9 @@ build_appendix() {
 \usepackage{hyperref}
 \usepackage{booktabs}
 \usepackage{longtable}
+\usepackage{amsmath}
+\usepackage{tikz}
+\usetikzlibrary{positioning}
 
 \lstset{
   basicstyle=\small\ttfamily,

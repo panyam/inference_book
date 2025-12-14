@@ -16,63 +16,188 @@
 \label{sec:rise-of-self-hosted}
 % =============================================================================
 
-% TODO: Write introduction about the current state of AI
-% - Explosion of capable open models (Llama, Mistral, Qwen, etc.)
-% - Gap between API-based AI and self-hosted
-% - The democratization of AI infrastructure
+The landscape of AI deployment shifted fundamentally in 2023 when Meta released Llama 2 under a permissive license~\cite{touvron2023llama2}. For the first time, a model competitive with commercial APIs was available for local deployment. Other organizations followed: Mistral AI released their 7B model in September 2023~\cite{jiang2023mistral}, Alibaba open-sourced the Qwen family~\cite{bai2023qwen}, Microsoft published the Phi series optimized for efficiency~\cite{li2023phi}, and Google contributed Gemma~\cite{team2024gemma}.
+
+These models can run on consumer hardware. A 7 billion parameter model quantized to 4-bit precision requires approximately 4GB of VRAM---well within the capacity of a laptop GPU or even a MacBook's unified memory. The barrier to entry is no longer access to models or specialized hardware; it's the systems knowledge required to deploy and operate them reliably.
+
+When you use a hosted API, the trade-offs are straightforward: you pay per token, accept the provider's latency (typically 50--200ms for first token), and send your data to external servers. When you self-host, those trade-offs invert. Your per-request costs drop to fractions of a cent after the initial hardware investment. Latency becomes a function of your local compute rather than network round-trips. Your data never leaves infrastructure you control.
+
+The complexity trade-off is real. Self-hosting requires understanding GPU memory hierarchies, model quantization formats, inference engine architectures, and production deployment patterns. This book provides that knowledge systematically, building from a single 7B model on a laptop to a distributed 400B deployment across multiple GPUs.
 
 % =============================================================================
 \section{Training vs. Inference: Understanding the Difference}
 \label{sec:training-vs-inference}
 % =============================================================================
 
-% TODO: Explain the fundamental difference
-% - Training: Learning from data, compute-intensive, rare
-% - Inference: Using trained model, lighter, continuous
-% - Resource comparison table
-% - Why inference is accessible to individuals and small teams
+The terms "training" and "inference" describe two fundamentally different computational processes. Training creates a model by learning patterns from data. Inference uses that trained model to generate outputs for new inputs. The resource requirements differ by orders of magnitude, which is why you can run inference on a laptop but training typically requires a data center.
+
+This book focuses on inference, not training. We won't derive backpropagation equations or explain attention mechanisms mathematically---other texts cover that well~\cite{goodfellow2016deep, vaswani2017attention}. Instead, we treat models as artifacts you download and deploy. The explanations below provide enough context to understand resource requirements and make informed infrastructure decisions. If terms like "parameters" or "gradients" are unfamiliar, the brief descriptions here should suffice; deeper understanding isn't required to build and operate inference systems.
 
 \subsection{What Happens During Training}
 \label{subsec:training}
 
-% TODO: High-level explanation of training
-% - Forward pass, backward pass, gradient descent
-% - Why it needs so much compute
-% - Data requirements
+Training a large language model involves adjusting billions of numerical parameters so the model can predict the next token in a sequence. The process works in three steps, repeated millions of times:
+
+\begin{enumerate}
+\item \textbf{Forward pass}: Input text flows through the network, producing a prediction for the next token.
+\item \textbf{Loss calculation}: The prediction is compared to the actual next token, producing an error signal.
+\item \textbf{Backward pass}: The error propagates backward through the network via gradient descent, slightly adjusting each parameter to reduce future errors.
+\end{enumerate}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    node distance=1.5cm,
+    box/.style={rectangle, draw, minimum width=2.5cm, minimum height=0.8cm, align=center},
+    arrow/.style={->, >=stealth, thick}
+]
+    % Nodes
+    \node[box] (input) {Input Tokens};
+    \node[box, right=of input] (network) {Neural Network\\(7B parameters)};
+    \node[box, right=of network] (pred) {Predicted\\Token};
+    \node[box, below=of pred] (actual) {Actual Token};
+    \node[box, below=of network] (loss) {Loss};
+    \node[box, below=of input] (grad) {Gradients};
+
+    % Forward pass (top)
+    \draw[arrow, blue] (input) -- node[above, font=\small] {Forward} (network);
+    \draw[arrow, blue] (network) -- (pred);
+
+    % Loss calculation
+    \draw[arrow] (pred) -- (loss);
+    \draw[arrow] (actual) -- (loss);
+
+    % Backward pass
+    \draw[arrow, red] (loss) -- node[below, font=\small] {Backward} (grad);
+    \draw[arrow, red, dashed] (grad) -- node[left, font=\small, align=center] {Update\\weights} (network);
+
+    % Loop indicator
+    \draw[arrow, thick, dotted] (grad.west) -- ++(-0.5,0) |- node[left, font=\small, pos=0.25] {Repeat} (input.west);
+\end{tikzpicture}
+\caption{The training loop. Each iteration performs a forward pass (blue) to generate predictions, computes the loss against actual targets, then propagates gradients backward (red) to update model weights. Training Llama 2 70B required approximately 1.7 million GPU hours of this loop.}
+\label{fig:training-loop}
+\end{figure}
+
+The backward pass is the expensive part. It requires storing intermediate activations from the forward pass (consuming memory) and computing gradients for every parameter (consuming compute). For a 7B parameter model, this means computing and storing 7 billion gradients per training step.
+
+Training Llama 2 70B required 1.7 million GPU hours on A100 80GB GPUs~\cite{touvron2023llama2}. At current cloud prices of approximately \$2/hour per A100, that represents over \$3 million in compute costs---before accounting for failed experiments, hyperparameter tuning, and infrastructure overhead. Training also requires massive datasets: Llama 2 used 2 trillion tokens of text data.
 
 \subsection{What Happens During Inference}
 \label{subsec:inference}
 
-% TODO: Explain inference mechanics
-% - Forward pass only
-% - Autoregressive generation for LLMs
-% - Memory requirements vs compute requirements
+Inference is simpler: it runs only the forward pass. There's no loss calculation, no gradient computation, and no parameter updates. The model weights are fixed; you're simply using them to transform inputs into outputs.
+
+For large language models, inference works autoregressively---the model generates one token at a time, feeding each generated token back as input to produce the next. Generating a 100-token response requires 100 forward passes through the network. This sequential dependency is why LLM inference can feel slow even on fast hardware: you cannot parallelize the generation of a single response.
+
+The resource profile differs substantially from training:
+
+\begin{itemize}
+\item \textbf{Memory}: You need to store the model weights and a \emph{key-value cache} (KV cache) that grows with context length. No gradient storage required.
+\item \textbf{Compute}: Forward passes only, with operations dominated by matrix multiplications between inputs and weights.
+\item \textbf{Data}: A single prompt, not terabytes of training data.
+\end{itemize}
+
+The KV cache deserves attention because it's often the limiting factor for long-context inference. During generation, the model caches intermediate computations (keys and values from the attention mechanism) to avoid redundant work. For a 7B model with a 4096-token context, the KV cache consumes approximately 1GB of memory at FP16 precision. At 128K context length, that grows to roughly 32GB---potentially exceeding the model weights themselves. Chapter~\ref{ch:hardware} covers memory calculations in detail.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    node distance=0.8cm,
+    box/.style={rectangle, draw, minimum width=1.8cm, minimum height=0.6cm, align=center, font=\small},
+    model/.style={rectangle, draw, fill=gray!20, minimum width=1.5cm, minimum height=0.6cm, align=center, font=\small},
+    cache/.style={rectangle, draw, fill=blue!10, minimum height=0.6cm, align=center, font=\scriptsize},
+    arrow/.style={->, >=stealth}
+]
+    % Step 1
+    \node[box] (p1) {Prompt};
+    \node[model, right=of p1] (m1) {Model};
+    \node[box, right=of m1] (t1) {Token 1};
+    \draw[arrow] (p1) -- (m1);
+    \draw[arrow] (m1) -- (t1);
+
+    % Step 2
+    \node[box, below=1.2cm of p1] (p2) {Prompt + T1};
+    \node[model, right=of p2] (m2) {Model};
+    \node[cache, below=0.1cm of m2, minimum width=0.8cm] (kv2) {KV};
+    \node[box, right=of m2] (t2) {Token 2};
+    \draw[arrow] (p2) -- (m2);
+    \draw[arrow] (m2) -- (t2);
+    \draw[arrow, dashed, gray] (t1) -- (p2);
+
+    % Step 3
+    \node[box, below=1.2cm of p2] (p3) {Prompt + T1 + T2};
+    \node[model, right=of p3] (m3) {Model};
+    \node[cache, below=0.1cm of m3, minimum width=1.2cm] (kv3) {KV Cache};
+    \node[box, right=of m3] (t3) {Token 3};
+    \draw[arrow] (p3) -- (m3);
+    \draw[arrow] (m3) -- (t3);
+    \draw[arrow, dashed, gray] (t2) -- (p3);
+
+    % Labels
+    \node[left=0.3cm of p1, font=\scriptsize] {Step 1:};
+    \node[left=0.3cm of p2, font=\scriptsize] {Step 2:};
+    \node[left=0.3cm of p3, font=\scriptsize] {Step 3:};
+
+    % Note
+    \node[below=0.5cm of kv3, font=\scriptsize, text=blue!60!black] {KV cache grows with context length};
+\end{tikzpicture}
+\caption{Autoregressive inference. Each token is generated by a forward pass through the model, then appended to the context for the next iteration. The KV cache stores intermediate attention computations to avoid redundant work, growing with each generated token.}
+\label{fig:autoregressive-inference}
+\end{figure}
+
+A single inference request on a 7B model takes 10--100 milliseconds for the first token (depending on prompt length) and 20--50 milliseconds per subsequent token on a modern consumer GPU. This is the timescale you'll work with throughout this book: milliseconds per token, not months per training run.
 
 \subsection{Resource Comparison}
 \label{subsec:resource-comparison}
 
-% TODO: Create comparison table
-% | Aspect | Training | Inference |
-% | Hardware | 8+ A100s | 1 consumer GPU |
-% | Time | Days/Weeks | Milliseconds/Seconds |
-% | Data | TB of text | Single prompt |
-% | Cost | $100K+ | $0.001/request |
+Table~\ref{tab:training-vs-inference} summarizes the resource differences. The key insight: training is a one-time cost borne by model creators (Meta, Mistral, etc.), while inference is the ongoing cost you pay when deploying models. This book assumes someone else has already trained the model; your job is to run it efficiently.
+
+\begin{table}[htbp]
+\centering
+\caption{Resource requirements for training versus inference of a 70B parameter model.}
+\label{tab:training-vs-inference}
+\begin{tabular}{lll}
+\toprule
+\textbf{Aspect} & \textbf{Training} & \textbf{Inference} \\
+\midrule
+Hardware & 8+ A100 80GB GPUs & 1--2 consumer GPUs \\
+Time per run & Weeks to months & 10--100 ms per token \\
+Data required & Trillions of tokens & Single prompt \\
+Memory usage & Weights + gradients + activations & Weights + KV cache \\
+Compute cost & \$1--10 million & \$0.0001--0.01 per request \\
+Who pays & Model creator & You (the deployer) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The implication is significant: you can leverage billions of dollars of training investment by downloading open-weight models and running inference on hardware you control. A \$1,000 GPU can serve the same model that cost millions to train.
 
 % =============================================================================
 \section{Why Self-Host?}
 \label{sec:why-self-host}
 % =============================================================================
 
-% TODO: Cover the key motivations
+Organizations and individuals choose self-hosted inference for four primary reasons: cost control, data privacy, latency requirements, and customization needs. The weight of each factor varies by use case. A hobbyist experimenting on weekends has different priorities than a healthcare company processing patient records.
 
 \subsection{Cost Control}
 \label{subsec:cost-control}
 
-% TODO: Economic analysis
-% - API pricing breakdown
-% - Self-hosted cost modeling
-% - Break-even calculations
-% - When each makes sense
+API pricing follows a per-token model. As of Dec 2025, OpenAI's GPT-5 costs \$1.75 per million input tokens and \$14.00 per million output tokens~\cite{openai2025pricing}. Anthropic's Claude Sonnet 4.5 costs \$3.00 input and \$15.00 output per million tokens, while Claude Opus 4.5 runs \$5.00 input and \$25.00 output~\cite{anthropic2025pricing}. These costs accumulate quickly at scale.
+
+Consider a customer support application handling 10,000 conversations per day, averaging 500 input tokens and 500 output
+tokens per conversation. At GPT-5 rates, that's approximately \$56 per day (\$8.75 input + \$70 output), or \$2,340 per
+month. For a coding assistant processing 100,000 requests daily with longer outputs, monthly API costs can reach
+\$40,000--70,000 depending on the model tier.
+
+Self-hosted costs work differently. The primary expenses are:
+
+\begin{itemize}
+\item \textbf{Hardware}: A single RTX 4090 (~ \$3,000) can run a 7B model at 30--50 tokens/second, or a quantized 70B model at 5--10 tokens/second.
+\item \textbf{Electricity}: GPUs under load draw 300--400W. At \$0.12/kWh, that's roughly \$25--35/month for continuous operation.
+\item \textbf{Maintenance}: Minimal for small deployments; significant for multi-GPU clusters.
+\end{itemize}
+
+The break-even calculation depends on utilization. A \$2,000 GPU investment pays for itself in 1--2 months if you're replacing \$1,500/month in API costs. If your usage is sporadic---a few hundred requests per day---APIs may remain more economical. Chapter~\ref{ch:hardware} provides detailed cost models for different deployment scales.
 
 \subsection{Privacy and Data Sovereignty}
 \label{subsec:privacy}
