@@ -4,10 +4,11 @@
 # Generates PDFs in ./gen folder
 #
 # Usage:
-#   ./build.sh              # Build entire book
-#   ./build.sh chapter01    # Build single chapter
-#   ./build.sh all-chapters # Build all chapters individually
-#   ./build.sh clean        # Clean generated files
+#   ./build.sh                          # Build entire book
+#   ./build.sh chapter01                # Build single chapter
+#   ./build.sh chapter01 chapter04 book # Build multiple targets
+#   ./build.sh all-chapters             # Build all chapters individually
+#   ./build.sh clean                    # Clean generated files
 #
 
 set -e
@@ -162,6 +163,13 @@ build_chapter() {
 
 \mainmatter
 HEADER
+
+    # Extract chapter number and set counter appropriately
+    local chapter_num=$(echo "${chapter_name}" | sed 's/chapter0*//' | sed 's/_.*$//')
+    if [[ "$chapter_num" =~ ^[0-9]+$ ]] && [ "$chapter_num" -gt 1 ]; then
+        local prev_chapter=$((chapter_num - 1))
+        echo "\\setcounter{chapter}{${prev_chapter}}" >> "${temp_file}"
+    fi
 
     # Add the chapter include
     echo "\\input{${chapter_file}}" >> "${temp_file}"
@@ -322,9 +330,9 @@ clean() {
 show_help() {
     echo "Build script for Self-Hosted AI Inference book"
     echo ""
-    echo "Usage: $0 [command]"
+    echo "Usage: $0 [target...]"
     echo ""
-    echo "Commands:"
+    echo "Targets:"
     echo "  (no args)       Build the entire book"
     echo "  book            Build the entire book"
     echo "  chapter01       Build a specific chapter (chapter01, chapter02, etc.)"
@@ -335,40 +343,57 @@ show_help() {
     echo "  clean           Remove all generated files"
     echo "  help            Show this help message"
     echo ""
+    echo "Multiple targets can be specified:"
+    echo "  $0 chapter01 chapter04 book"
+    echo ""
     echo "Output directory: ${GEN_DIR}"
 }
 
+# Function to build a single target
+build_target() {
+    local target="$1"
+    case "$target" in
+        "book")
+            build_full_book
+            ;;
+        "chapter"*)
+            build_chapter "$target"
+            ;;
+        "all-chapters")
+            build_all_chapters
+            ;;
+        "appendix"*)
+            build_appendix "$target"
+            ;;
+        "all-appendices")
+            build_all_appendices
+            ;;
+        "all")
+            build_full_book
+            build_all_chapters
+            build_all_appendices
+            ;;
+        "clean")
+            clean
+            ;;
+        "help"|"-h"|"--help")
+            show_help
+            ;;
+        *)
+            print_error "Unknown command: $target"
+            show_help
+            exit 1
+            ;;
+    esac
+}
+
 # Main entry point
-case "${1:-book}" in
-    "book")
-        build_full_book
-        ;;
-    "chapter"*)
-        build_chapter "$1"
-        ;;
-    "all-chapters")
-        build_all_chapters
-        ;;
-    "appendix"*)
-        build_appendix "$1"
-        ;;
-    "all-appendices")
-        build_all_appendices
-        ;;
-    "all")
-        build_full_book
-        build_all_chapters
-        build_all_appendices
-        ;;
-    "clean")
-        clean
-        ;;
-    "help"|"-h"|"--help")
-        show_help
-        ;;
-    *)
-        print_error "Unknown command: $1"
-        show_help
-        exit 1
-        ;;
-esac
+if [ $# -eq 0 ]; then
+    # No arguments - build the full book
+    build_full_book
+else
+    # Process each argument
+    for target in "$@"; do
+        build_target "$target"
+    done
+fi

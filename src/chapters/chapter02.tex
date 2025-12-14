@@ -16,36 +16,104 @@
 \label{sec:transformer-memory}
 % =============================================================================
 
-% TODO: Explain memory usage during inference
-% - Model weights
-% - KV cache
-% - Activation memory
-% - Working memory
+Before selecting hardware, you need to understand what consumes memory during inference. Three components dominate: model weights, the KV cache, and working memory for activations. Each scales differently with model size and usage patterns.
 
 \subsection{Model Weights}
 \label{subsec:model-weights}
 
-% TODO: Weight storage
-% - Parameters and precision
-% - Memory formula: params × bytes_per_param
-% - Example calculations
+Model weights are the learned parameters---the numbers that make a model behave intelligently. A "7B model" has approximately 7 billion parameters. Each parameter requires storage, and the memory needed depends on numerical precision.
+
+The formula is straightforward:
+
+\begin{equation}
+\text{Weight Memory} = \text{Parameters} \times \text{Bytes per Parameter}
+\end{equation}
+
+At full precision (FP32), each parameter uses 4 bytes. A 7B model requires $7 \times 10^9 \times 4 = 28$ GB just for weights---more than most consumer GPUs offer. This is why nobody runs large models at FP32 for inference.
+
+Half precision (FP16 or BF16) cuts this in half: 2 bytes per parameter, so 14 GB for a 7B model. This fits on an RTX 4090 (24 GB) with room to spare, but exceeds an RTX 4070 Ti (16 GB) when you account for other memory needs.
+
+Quantization reduces precision further. At 4-bit precision (INT4), each parameter uses only 0.5 bytes, bringing our 7B model down to 3.5 GB. This is why quantized models run on laptops and modest GPUs---the memory reduction is dramatic:
+
+\begin{table}[htbp]
+\centering
+\caption{Weight memory for common model sizes at different precisions.}
+\label{tab:weight-memory}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Model} & \textbf{FP32} & \textbf{FP16} & \textbf{INT8} & \textbf{INT4} \\
+\midrule
+7B   & 28 GB  & 14 GB  & 7 GB   & 3.5 GB \\
+13B  & 52 GB  & 26 GB  & 13 GB  & 6.5 GB \\
+30B  & 120 GB & 60 GB  & 30 GB  & 15 GB \\
+70B  & 280 GB & 140 GB & 70 GB  & 35 GB \\
+400B & 1.6 TB & 800 GB & 400 GB & 200 GB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+These numbers represent minimums---the weights alone, with nothing else. Actual VRAM usage is higher due to the KV cache and working memory we'll cover next.
 
 \subsection{The KV Cache}
 \label{subsec:kv-cache}
 
-% TODO: Explain KV cache
-% - What it stores
-% - Why it grows with context
-% - Memory formula for KV cache
-% - Why it matters for long contexts
+The KV cache is the second major memory consumer, and unlike weights, it grows during inference. Understanding it explains why long conversations consume more memory than short ones.
+
+During autoregressive generation, the model generates one token at a time. For each new token, it must "attend" to all previous tokens---the attention mechanism needs to compute relationships between the new token and everything that came before. Without caching, this would require reprocessing the entire context for every generated token, making generation quadratically slower.
+
+The KV cache stores the key and value vectors computed during attention. Once computed, these don't change, so caching them avoids redundant computation. The trade-off: memory consumption that grows linearly with context length.
+
+The KV cache size depends on model architecture:
+
+\begin{equation}
+\text{KV Cache} = 2 \times L \times H \times D \times C \times B \times N
+\end{equation}
+
+Where:
+\begin{itemize}
+\item $L$ = number of layers
+\item $H$ = number of attention heads (or KV heads for GQA)
+\item $D$ = dimension per head
+\item $C$ = context length (tokens)
+\item $B$ = bytes per value (2 for FP16)
+\item $N$ = batch size
+\item Factor of 2 accounts for both keys and values
+\end{itemize}
+
+For a typical 7B model (32 layers, 32 heads, 128 dimensions per head) at FP16:
+
+\begin{equation}
+\text{KV Cache} = 2 \times 32 \times 32 \times 128 \times C \times 2 = 524,288 \times C \text{ bytes}
+\end{equation}
+
+At 4096 context tokens: $\sim$2 GB. At 32K context: $\sim$16 GB. At 128K context: $\sim$64 GB---potentially exceeding the weight memory itself.
+
+This is why long-context inference is memory-intensive. A 7B model that fits comfortably in 8 GB VRAM at 4K context may require 24 GB at 32K context. Grouped Query Attention (GQA), used in newer models like Llama 3 and Qwen 2.5, reduces KV cache size by sharing key-value heads, typically by 4--8x.
 
 \subsection{Activation and Working Memory}
 \label{subsec:activation-memory}
 
-% TODO: Other memory needs
-% - Intermediate activations
-% - Batch processing overhead
-% - Safety margins
+Beyond weights and KV cache, inference requires working memory for intermediate computations. This includes attention scores, feed-forward network activations, and temporary buffers for matrix operations.
+
+For a single forward pass, activation memory scales with model dimensions and batch size:
+
+\begin{equation}
+\text{Activation Memory} \approx B \times C \times D_{\text{model}} \times L \times k
+\end{equation}
+
+Where $k$ is a small constant (typically 2--4) depending on the engine's memory management. For a 7B model with batch size 1 and 4K context, activations consume roughly 200--500 MB.
+
+This seems small compared to weights and KV cache, but it matters for two reasons. First, activation memory must be allocated contiguously, and memory fragmentation can prevent allocation even when total free memory appears sufficient. Second, during batched inference, activation memory grows linearly with batch size.
+
+\subsubsection*{The Overhead Budget}
+
+Practical VRAM planning requires a safety margin. CUDA maintains its own memory pools, the inference engine has overhead, and memory fragmentation accumulates over time. A conservative estimate adds 10--20\% to your calculated requirements:
+
+\begin{equation}
+\text{Total VRAM} \approx (\text{Weights} + \text{KV Cache} + \text{Activations}) \times 1.15
+\end{equation}
+
+If your calculations show 20 GB needed, plan for 23 GB to be safe. This matters when choosing between a 24 GB GPU that barely fits and a 48 GB GPU with comfortable headroom. The latter allows longer contexts, larger batches, or simply more reliable operation.
 
 % =============================================================================
 \section{VRAM Calculation}

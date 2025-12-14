@@ -406,12 +406,15 @@ The response is JSON containing the generated text and timing metadata:
 \begin{lstlisting}
 {
   "model": "qwen2.5:7b",
-  "response": "AI inference is the process of using a trained...",
+  "response": "AI inference refers to the process of ....",
   "done": true,
-  "total_duration": 1284000000,
-  "prompt_eval_count": 12,
-  "eval_count": 87,
-  "eval_duration": 1150000000
+  "context": [ 151644, 8948, 198, ... ],
+  "total_duration": 1930969541,
+  "load_duration": 41119208,
+  "prompt_eval_count": 39,
+  "prompt_eval_duration": 112548500,
+  "eval_count": 80,
+  "eval_duration": 1776717000
 }
 \end{lstlisting}
 
@@ -453,7 +456,9 @@ Language models don't process text character by character. They operate on \emph
 
 Different models use different tokenizers. Qwen 2.5 uses a byte-pair encoding (BPE) tokenizer with approximately 150,000 tokens in its vocabulary. This affects everything from input costs (APIs charge per token) to context limits (models have token budgets, not character budgets).
 
-In the response above, \texttt{prompt\_eval\_count: 12} indicates your prompt consumed 12 tokens. The phrase "Explain what AI inference is in one paragraph." contains 10 words but 12 tokens---the tokenizer made different choices than word boundaries. The field \texttt{eval\_count: 87} shows the model generated 87 tokens in response.
+In the response above, \texttt{prompt\_eval\_count: 39} indicates your prompt consumed 39 tokens. The phrase "Explain
+what AI inference is in one paragraph." contains 8 words but 39 tokens---the tokenizer made different choices than word
+boundaries. The field \texttt{eval\_count: 80} shows the model generated 80 tokens in response.
 
 You can inspect tokenization directly:
 
@@ -470,17 +475,17 @@ Understanding tokenization matters for three reasons. First, cost: API pricing i
 The response includes timing data in nanoseconds:
 
 \begin{itemize}
-\item \texttt{total\_duration}: Wall-clock time for the entire request---1.28 seconds in our example.
-\item \texttt{eval\_duration}: Time spent generating tokens---1.15 seconds. The difference (130ms) covers prompt processing and overhead.
+\item \texttt{total\_duration}: Wall-clock time for the entire request---1.93 seconds in our example.
+\item \texttt{eval\_duration}: Time spent generating tokens---1.78 seconds. The difference (150ms) covers prompt processing and overhead.
 \end{itemize}
 
-From these numbers, you can calculate \emph{tokens per second}: $87 \text{ tokens} / 1.15 \text{ seconds} \approx 76 \text{ tok/s}$. This metric---generation throughput---is the primary performance indicator for inference systems. Higher is better; it directly affects how fast users see responses.
+From these numbers, you can calculate \emph{tokens per second}: $80 \text{ tokens} / 1.78 \text{ seconds} \approx 45 \text{ tok/s}$. This metric---generation throughput---is the primary performance indicator for inference systems. Higher is better; it directly affects how fast users see responses.
 
 Two latency metrics matter for interactive applications:
 
 \begin{description}
 \item[Time to First Token (TTFT)] How long until the first generated token appears. For streaming responses, this is perceived latency---users see something immediately even if generation continues. TTFT includes prompt processing time.
-\item[Inter-Token Latency (ITL)] Average time between generated tokens. With 87 tokens in 1.15 seconds, ITL is approximately 13ms. Lower ITL means smoother streaming.
+\item[Inter-Token Latency (ITL)] Average time between generated tokens. With 80 tokens in 1.78 seconds, ITL is approximately 15ms. Lower ITL means smoother streaming.
 \end{description}
 
 Hardware dramatically affects these numbers. The same Qwen 2.5 7B model might achieve 20 tok/s on CPU, 75 tok/s on an RTX 4060, and 150 tok/s on an RTX 4090. Chapter~\ref{ch:hardware} provides benchmarks across GPU tiers.
