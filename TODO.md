@@ -41,7 +41,7 @@
 
 ### Chapter 1: Introduction to Self-Hosted Inference
 
-**Status:** 🟡 Outline Created
+**Status:** 🟢 First Draft Complete
 **File:** `src/chapters/chapter01.tex`
 
 **Learning Objectives:**
@@ -73,46 +73,46 @@
 #### Task Breakdown
 
 **1.1 Section: The Rise of Self-Hosted AI**
-- [ ] Write opening hook about democratization of AI (2-3 paragraphs)
-- [ ] List major open model families (Llama, Mistral, Qwen, Phi, Gemma)
-- [ ] Explain the gap between API-based and self-hosted AI
-- [ ] Add timeline/milestones of open model releases
+- [x] Write opening hook about democratization of AI (2-3 paragraphs)
+- [x] List major open model families (Llama, Mistral, Qwen, Phi, Gemma)
+- [x] Explain the gap between API-based and self-hosted AI
+- [x] Add timeline/milestones of open model releases
 
 **1.2 Section: Training vs. Inference**
-- [ ] Write subsection: What Happens During Training
-- [ ] Write subsection: What Happens During Inference
-- [ ] Create resource comparison table (Training vs Inference)
-- [ ] Create diagram: Training vs Inference visual comparison
+- [x] Write subsection: What Happens During Training
+- [x] Write subsection: What Happens During Inference
+- [x] Create resource comparison table (Training vs Inference)
+- [x] Create diagram: Training vs Inference visual comparison (TikZ)
 
 **1.3 Section: Why Self-Host?**
-- [ ] Write Cost Control subsection (API pricing, self-hosted cost modeling, break-even)
-- [ ] Write Privacy and Data Sovereignty subsection (GDPR, HIPAA, industries)
-- [ ] Write Latency and Performance subsection
-- [ ] Write Customization and Control subsection
-- [ ] Write When NOT to Self-Host subsection
+- [x] Write Cost Control subsection (API pricing, self-hosted cost modeling, break-even)
+- [x] Write Privacy and Data Sovereignty subsection (GDPR, HIPAA, industries)
+- [x] Write Latency and Performance subsection
+- [x] Write Customization and Control subsection
+- [x] Write When NOT to Self-Host subsection
 
 **1.4 Section: What You'll Build in This Book**
-- [ ] Write Progressive Journey subsection (4 parts overview)
-- [ ] Write Control Plane Evolution subsection (why Go, interface design)
-- [ ] Create visual: 4-part journey diagram
+- [x] Write Progressive Journey subsection (4 parts overview)
+- [x] Write Control Plane Evolution subsection (why Go, interface design)
+- [x] Create visual: Control plane evolution table
 
 **1.5 Section: Hands-On First Inference**
-- [ ] Write Installing Ollama guide (macOS, Linux, Windows)
-- [ ] Write Running Your First Model guide
-- [ ] Write Making API Requests guide (add prose to existing code)
+- [x] Write Installing Ollama guide (macOS, Linux, Windows)
+- [x] Write Running Your First Model guide (Qwen 2.5:7b)
+- [x] Write Making API Requests guide (streaming and non-streaming)
 
 **1.6 Section: Understanding the Response**
-- [ ] Explain tokens and tokenization
-- [ ] Explain generation parameters
-- [ ] Explain metrics (tokens/second, timing)
+- [x] Explain tokens and tokenization
+- [x] Explain generation parameters (temperature, top_p, num_predict)
+- [x] Explain metrics (tokens/second, TTFT, ITL)
 
 **1.7 Section: Summary**
-- [ ] Write chapter summary paragraph
-- [ ] Review Key Takeaways box (exists)
-- [ ] Write "Next chapter preview" paragraph
+- [x] Write chapter summary paragraph
+- [x] Review Key Takeaways box
+- [x] Write "Next chapter preview" paragraph
 
 **1.8 References**
-- [ ] Add references to references01.tex
+- [x] Add references to references01.tex
 
 ---
 
@@ -674,6 +674,7 @@
 | F | Troubleshooting Guide | 🟡 | LOW | Common issues |
 | G | TPU Inference | 🟡 | LOW | Google Cloud TPU guide |
 | H | Cost Calculators | 🟡 | MEDIUM | Spreadsheet templates |
+| I | Mistral Models Reference | 🟡 | MEDIUM | EU alternative to Qwen |
 
 ---
 
@@ -752,6 +753,8 @@ The patterns, code, and architecture apply equally to all deployment models.
 - vLLM as primary production engine
 - Chapter 5.5 (Browser AI) is optional
 - **Infrastructure agnostic** - cloud and local treated equally throughout
+- **Primary model family: Qwen** (Alibaba) - active development, Apache 2.0, good range of sizes
+- **Appendix for European alternative** - Mistral models for EU-based readers
 
 ---
 
@@ -792,4 +795,4 @@ The patterns, code, and architecture apply equally to all deployment models.
 
 ---
 
-*Last Updated: December 2024*
+*Last Updated: December 2025*

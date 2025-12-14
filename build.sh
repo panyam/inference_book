@@ -88,10 +88,13 @@ build_chapter() {
 \usepackage{graphicx}
 \usepackage{multicol}
 \usepackage[bottom]{footmisc}
+\usepackage[T1]{fontenc}
 \usepackage{newtxtext}
 \usepackage[varvw]{newtxmath}
+\usepackage{textcomp}
 \usepackage{listings}
 \usepackage{xcolor}
+\usepackage{upquote}
 \usepackage{hyperref}
 \usepackage{booktabs}
 \usepackage{longtable}
@@ -116,15 +119,15 @@ build_chapter() {
   morestring=[b]`
 }
 
+% Code listing style - optimized for copy-paste
 \lstset{
   basicstyle=\small\ttfamily,
   breakatwhitespace=false,
   breaklines=true,
   captionpos=b,
   keepspaces=true,
-  numbers=left,
-  numbersep=5pt,
-  numberstyle=\tiny\color{gray},
+  columns=fullflexible,
+  numbers=none,
   showspaces=false,
   showstringspaces=false,
   showtabs=false,
@@ -132,7 +135,8 @@ build_chapter() {
   frame=single,
   framerule=0.5pt,
   rulecolor=\color{gray},
-  backgroundcolor=\color{gray!5}
+  backgroundcolor=\color{gray!5},
+  upquote=true
 }
 
 \hypersetup{

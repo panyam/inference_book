@@ -275,7 +275,7 @@ The book is organized into four parts, each targeting a larger model size and ad
 \begin{description}
 \item[Part I: Foundations (7B)] You'll run your first model, understand hardware requirements, learn model formats and quantization, compare inference engines, and build Control Plane v0.1---a basic proxy with health checks and metrics. A single consumer GPU or cloud instance handles everything.
 
-\item[Part II: Production (30B)] The control plane gains authentication, rate limiting, caching, and request queuing. You'll deploy 30B models that require more careful memory management and learn optimization techniques that squeeze maximum throughput from your hardware.
+\item[Part II: Production (30B)] The control plane gains auth, rate limiting, caching, and request queuing. You'll deploy 30B models requiring careful memory management and learn optimization techniques that squeeze maximum throughput from your hardware.
 
 \item[Part III: Multi-Tenant (70B)] Control Plane v0.3 supports multiple tenants with isolated quotas, usage tracking, and billing integration. You'll distribute 70B models across multiple GPUs using tensor parallelism and build routing logic that directs requests to appropriate backends.
 
@@ -312,86 +312,216 @@ Each version builds on the previous. Code from Chapter 5 remains in the final sy
 
 The control plane is the tangible artifact, but the deeper goal is building intuition. You'll learn enough about transformer memory layout to calculate VRAM requirements for any model. You'll understand quantization well enough to choose between Q4\_K\_M and Q5\_K\_S for your workload. You'll grasp attention mechanisms sufficiently to reason about KV cache growth and context length trade-offs.
 
-This isn't a machine learning theory book---we won't derive backpropagation or prove convergence bounds. But we cover the systems-relevant math: memory calculations, throughput modeling, parallelism strategies. When new techniques emerge---mixture of experts, speculative decoding, expert parallelism---you'll have the mental framework to evaluate them. Chapter~\ref{ch:optimization} implements expert parallelism from scratch, not just to use it, but to understand when and why it helps.
+This isn't a machine learning theory book---we won't derive backpropagation or prove convergence bounds. But we cover the systems-relevant math: memory calculations, throughput modeling, parallelism strategies. When new techniques emerge---mixture of experts, speculative decoding, expert parallelism---you'll have the mental framework to evaluate them. Chapter~\ref{ch:30b-optimization} implements expert parallelism from scratch, not just to use it, but to understand when and why it helps.
 
 The field moves fast. Models that seem large today will be routine tomorrow. The specific numbers in this book will date; the systems thinking won't. Our aim is engineers who can read a new model's architecture paper and estimate what hardware it needs, or evaluate a new inference engine and predict where it will excel.
 
 % =============================================================================
-\section{Hands-On: Your First Local Inference}
+\section{Hands-On: Your First Inference}
 \label{sec:hands-on-first-inference}
 % =============================================================================
 
-% TODO: Step-by-step guide
+Enough theory---let's run a model. We'll use Ollama, an inference server that handles model downloads, format conversion, and serving behind a simple API. It's not the fastest option (we'll cover vLLM and llama.cpp later), but it's the easiest path from zero to working inference.
+
+By the end of this section, you'll have a 7B parameter model running and responding to requests.
 
 \subsection{Installing Ollama}
 \label{subsec:installing-ollama}
 
-% TODO: Installation instructions
-% - macOS: brew install ollama
-% - Linux: curl script
-% - Windows: installer
-% - Verify installation
+Ollama runs on macOS, Linux, and Windows. Installation takes under a minute:
+
+\begin{description}
+\item[macOS] Install via Homebrew:
+\begin{lstlisting}[language=bash]
+brew install ollama
+\end{lstlisting}
+
+\item[Linux] Use the install script:
+\begin{lstlisting}[language=bash]
+curl -fsSL https://ollama.com/install.sh | sh
+\end{lstlisting}
+
+\item[Windows] Download the installer from \url{https://ollama.com/download/windows}.
+\end{description}
+
+After installation, start the Ollama server:
+
+\begin{lstlisting}[language=bash]
+ollama serve
+\end{lstlisting}
+
+The server runs on \texttt{localhost:11434} by default. In a separate terminal, verify it's running:
+
+\begin{lstlisting}[language=bash]
+curl http://localhost:11434/api/tags
+\end{lstlisting}
+
+You should see an empty model list: \texttt{\{"models":[]\}}. We'll fix that next.
 
 \subsection{Running Your First Model}
 \label{subsec:first-model}
 
-% TODO: Running a model
-% - ollama pull llama3.2:7b
-% - ollama run llama3.2:7b
-% - Understanding what's happening
+Ollama downloads models on demand from its registry. We'll use Qwen 2.5, Alibaba's open model family that offers strong performance across reasoning, code, and multilingual tasks~\cite{qwen2025}. The 7B variant balances capability with modest hardware requirements:
+
+\begin{lstlisting}[language=bash]
+ollama pull qwen2.5:7b
+\end{lstlisting}
+
+The download is approximately 4.7GB (the model is quantized to 4-bit precision by default). Once complete, you can interact with it directly:
+
+\begin{lstlisting}[language=bash]
+ollama run qwen2.5:7b
+\end{lstlisting}
+
+This opens an interactive chat session. Type a message, press Enter, and watch tokens stream back. Behind the scenes, Ollama loads the model weights into memory (GPU if available, CPU otherwise), processes your input through the transformer, and generates tokens autoregressively---exactly the process we described in Section~\ref{sec:training-vs-inference}.
+
+Type \texttt{/bye} to exit the session.
+
+To see what models you have locally:
+
+\begin{lstlisting}[language=bash]
+ollama list
+\end{lstlisting}
+
+The output shows model name, size, and when it was last modified. As you work through this book, you'll accumulate models here---different sizes, different quantizations, different families. We use Qwen throughout the book for consistency; Appendix~\ref{app:mistral} provides equivalent commands for Mistral models if you prefer a European alternative.
 
 \subsection{Making API Requests}
 \label{subsec:api-requests}
 
-% TODO: API usage
-% - curl examples
-% - Python example
-% - Response structure
-% - Streaming vs non-streaming
+The interactive CLI is useful for experimentation, but applications call Ollama's HTTP API. The server exposes REST endpoints for generation, chat, and model management.
 
-\begin{programcode}{First Inference Request}
+A basic generation request:
+
 \begin{lstlisting}[language=bash]
-# Pull a 7B model
-ollama pull llama3.2:7b
-
-# Make an inference request
 curl http://localhost:11434/api/generate \
   -d '{
-    "model": "llama3.2:7b",
+    "model": "qwen2.5:7b",
     "prompt": "Explain what AI inference is in one paragraph.",
     "stream": false
   }'
 \end{lstlisting}
-\end{programcode}
+
+The response is JSON containing the generated text and timing metadata:
+
+\begin{lstlisting}
+{
+  "model": "qwen2.5:7b",
+  "response": "AI inference is the process of using a trained...",
+  "done": true,
+  "total_duration": 1284000000,
+  "prompt_eval_count": 12,
+  "eval_count": 87,
+  "eval_duration": 1150000000
+}
+\end{lstlisting}
+
+Setting \texttt{stream: false} waits for the complete response. For interactive applications, streaming provides better perceived latency---users see tokens as they're generated:
+
+\begin{lstlisting}[language=bash]
+curl http://localhost:11434/api/generate \
+  -d '{"model": "qwen2.5:7b", "prompt": "Write a haiku.", "stream": true}'
+\end{lstlisting}
+
+This returns newline-delimited JSON objects, one per generated token.
+
+For chat-style interactions with conversation history, use the \texttt{/api/chat} endpoint:
+
+\begin{lstlisting}[language=bash]
+curl http://localhost:11434/api/chat \
+  -d '{
+    "model": "qwen2.5:7b",
+    "messages": [
+      {"role": "user", "content": "What is the capital of France?"}
+    ],
+    "stream": false
+  }'
+\end{lstlisting}
+
+The API accepts additional parameters---\texttt{temperature}, \texttt{top\_p}, \texttt{num\_predict}---covered in Chapter~\ref{ch:inference-engines}. The defaults work well for initial experimentation.
 
 % =============================================================================
 \section{Understanding the Response}
 \label{sec:understanding-response}
 % =============================================================================
 
-% TODO: Explain response structure
-% - Tokens and tokenization
-% - Generation parameters
-% - Metrics (tokens/second, timing)
+The response from your first inference contains more than just text. The metadata reveals how the model processed your request---information that becomes essential for optimization and debugging.
+
+\subsection{Tokens and Tokenization}
+\label{subsec:tokens}
+
+Language models don't process text character by character. They operate on \emph{tokens}---subword units that balance vocabulary size against sequence length. The word "understanding" might be a single token; "tokenization" might split into "token" + "ization." Common words compress to single tokens; rare words decompose into pieces.
+
+Different models use different tokenizers. Qwen 2.5 uses a byte-pair encoding (BPE) tokenizer with approximately 150,000 tokens in its vocabulary. This affects everything from input costs (APIs charge per token) to context limits (models have token budgets, not character budgets).
+
+In the response above, \texttt{prompt\_eval\_count: 12} indicates your prompt consumed 12 tokens. The phrase "Explain what AI inference is in one paragraph." contains 10 words but 12 tokens---the tokenizer made different choices than word boundaries. The field \texttt{eval\_count: 87} shows the model generated 87 tokens in response.
+
+You can inspect tokenization directly:
+
+\begin{lstlisting}[language=bash]
+curl http://localhost:11434/api/generate \
+  -d '{"model": "qwen2.5:7b", "prompt": "Hello world", "raw": true}'
+\end{lstlisting}
+
+Understanding tokenization matters for three reasons. First, cost: API pricing is per-token, so knowing how your prompts tokenize helps budget. Second, context: a 4096-token context window accommodates different amounts of text depending on content. Code typically tokenizes more efficiently than prose; non-English text often tokenizes less efficiently. Third, performance: longer token sequences mean more computation. A 1000-token prompt requires more processing than a 100-token prompt, affecting latency.
+
+\subsection{Timing Metrics}
+\label{subsec:timing-metrics}
+
+The response includes timing data in nanoseconds:
+
+\begin{itemize}
+\item \texttt{total\_duration}: Wall-clock time for the entire request---1.28 seconds in our example.
+\item \texttt{eval\_duration}: Time spent generating tokens---1.15 seconds. The difference (130ms) covers prompt processing and overhead.
+\end{itemize}
+
+From these numbers, you can calculate \emph{tokens per second}: $87 \text{ tokens} / 1.15 \text{ seconds} \approx 76 \text{ tok/s}$. This metric---generation throughput---is the primary performance indicator for inference systems. Higher is better; it directly affects how fast users see responses.
+
+Two latency metrics matter for interactive applications:
+
+\begin{description}
+\item[Time to First Token (TTFT)] How long until the first generated token appears. For streaming responses, this is perceived latency---users see something immediately even if generation continues. TTFT includes prompt processing time.
+\item[Inter-Token Latency (ITL)] Average time between generated tokens. With 87 tokens in 1.15 seconds, ITL is approximately 13ms. Lower ITL means smoother streaming.
+\end{description}
+
+Hardware dramatically affects these numbers. The same Qwen 2.5 7B model might achieve 20 tok/s on CPU, 75 tok/s on an RTX 4060, and 150 tok/s on an RTX 4090. Chapter~\ref{ch:hardware} provides benchmarks across GPU tiers.
+
+\subsection{Generation Parameters}
+\label{subsec:generation-params}
+
+Beyond the prompt, several parameters control how the model generates text. These aren't visible in our simple request because Ollama used defaults, but they're available when you need them:
+
+\begin{itemize}
+\item \textbf{temperature}: Controls randomness. At 0, the model always picks the highest-probability token (deterministic). At 1.0, sampling follows the probability distribution. Higher values (up to 2.0) increase creativity and unpredictability. Default is typically 0.7--0.8.
+\item \textbf{top\_p} (nucleus sampling): Restricts sampling to tokens whose cumulative probability exceeds this threshold. At 0.9, the model considers only the most likely tokens that together account for 90\% of probability mass. Lower values increase focus; higher values allow more variety.
+\item \textbf{num\_predict}: Maximum tokens to generate. Limits response length. The model may stop earlier if it generates a stop token.
+\end{itemize}
+
+For most applications, defaults work well. Adjust temperature for creative tasks (higher) or factual extraction (lower). Chapter~\ref{ch:inference-engines} explores these parameters in depth with guidance on tuning for specific use cases.
 
 % =============================================================================
 \section{Summary}
 \label{sec:ch01-summary}
 % =============================================================================
 
-% TODO: Chapter summary
-% - Key concepts covered
-% - What you've accomplished
-% - Preview of next chapter
+This chapter established the foundation for everything that follows. You now understand the fundamental distinction between training and inference: training creates models through expensive, iterative optimization across massive datasets; inference uses those models for prediction through forward passes alone. This asymmetry---training costs millions, inference runs on a laptop---is why self-hosted inference is practical.
+
+You've evaluated the trade-offs. Self-hosting offers predictable costs, data control, lower latency, and freedom to customize. It requires systems knowledge and operational responsibility. Managed APIs remain appropriate for low-volume workloads, cutting-edge models, and teams without infrastructure expertise. The choice depends on your requirements---and often, organizations use both.
+
+Most importantly, you've run your first model. Qwen 2.5 7B is now responding to requests on your machine. You understand the response structure: tokens as the atomic unit, timing metrics that reveal performance, and parameters that control generation behavior.
 
 \begin{important}{Key Takeaways}
 \begin{itemize}
-\item Inference is fundamentally different from training and accessible with consumer hardware
-\item Self-hosting offers cost control, privacy, and customization benefits
-\item Open models like Llama, Mistral, and Qwen make self-hosting viable
-\item You've run your first local inference with Ollama
+\item Inference runs only forward passes---no gradients, no training data, achievable on consumer hardware.
+\item Self-hosted inference means controlling your stack, whether that's cloud instances, colocated servers, or local workstations.
+\item Open models (Qwen, Mistral, Llama, Phi, Gemma) make self-hosting viable for many production workloads.
+\item Tokens are the fundamental unit: they affect cost, context limits, and performance.
+\item Key metrics: tokens per second (throughput), time to first token (responsiveness), inter-token latency (streaming smoothness).
 \end{itemize}
 \end{important}
+
+\subsection*{Next: Hardware}
+
+Chapter~\ref{ch:hardware} answers the question you're likely asking: what hardware do I actually need? We'll calculate memory requirements for different model sizes, compare GPU tiers and their price-performance ratios, and help you choose infrastructure that matches your workload. You'll learn why a 7B model fits in 4GB but a 70B model needs 40GB---and what quantization has to do with it.
 
 % =============================================================================
 \section*{Problems}

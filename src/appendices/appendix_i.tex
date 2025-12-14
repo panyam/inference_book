@@ -1,0 +1,73 @@
+%%%%%%%%%%%%%%%%%%%%% appendix_i.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Appendix I: Mistral Models Reference
+%
+%%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Mistral Models Reference}
+\label{app:mistral}
+
+This appendix provides equivalent commands and configurations for Mistral models, offering a European alternative to the Qwen-focused examples in the main text.
+
+% =============================================================================
+\section{Mistral Model Family}
+\label{sec:mistral-family}
+% =============================================================================
+
+Mistral AI, founded in Paris in 2023, produces open-weight models known for strong performance relative to parameter count. Their models are released under permissive licenses and are particularly popular in European deployments where data sovereignty considerations favor EU-based alternatives.
+
+% TODO: Model comparison table
+% - Mistral 7B
+% - Mixtral 8x7B
+% - Mistral Nemo
+% - Mistral Large (if open)
+
+% =============================================================================
+\section{Installation and Setup}
+\label{sec:mistral-setup}
+% =============================================================================
+
+\subsection{Using Ollama}
+
+\begin{lstlisting}[language=bash]
+# Pull Mistral 7B (equivalent to Qwen 2.5:7b)
+ollama pull mistral:7b
+
+# Interactive session
+ollama run mistral:7b
+
+# API request
+curl http://localhost:11434/api/generate \
+  -d '{"model": "mistral:7b", "prompt": "Hello", "stream": false}'
+\end{lstlisting}
+
+\subsection{Using llama.cpp}
+
+\begin{lstlisting}[language=bash]
+# Download from Hugging Face
+./llama-server \
+  -m models/mistral-7b-instruct-v0.2.Q4_K_M.gguf \
+  -c 4096 \
+  --host 0.0.0.0 \
+  --port 8080
+\end{lstlisting}
+
+% =============================================================================
+\section{Command Mapping}
+\label{sec:mistral-commands}
+% =============================================================================
+
+The following table maps commands from the main text (using Qwen) to their Mistral equivalents.
+
+% TODO: Comprehensive command mapping table
+
+% =============================================================================
+\section{Performance Comparison}
+\label{sec:mistral-performance}
+% =============================================================================
+
+% TODO: Benchmark comparison Qwen vs Mistral
+% - Throughput
+% - Quality benchmarks
+% - Memory usage
+

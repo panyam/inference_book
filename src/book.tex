@@ -15,12 +15,15 @@
 \usepackage{multicol}        % used for the two-column index
 \usepackage[bottom]{footmisc}% places footnotes at page bottom
 
+\usepackage[T1]{fontenc}     % proper font encoding for quotes
 \usepackage{newtxtext}
 \usepackage[varvw]{newtxmath}% selects Times Roman as basic font
+\usepackage{textcomp}        % additional text symbols
 
 % Additional packages for technical book
 \usepackage{listings}        % code listings
 \usepackage{xcolor}          % colors for code
+\usepackage{upquote}         % preserve straight quotes in listings
 \usepackage{hyperref}        % hyperlinks
 \usepackage{booktabs}        % better tables
 \usepackage{longtable}       % multi-page tables
@@ -45,16 +48,15 @@
   morestring=[b]`
 }
 
-% Code listing style defaults
+% Code listing style defaults - optimized for copy-paste
 \lstset{
   basicstyle=\small\ttfamily,
   breakatwhitespace=false,
   breaklines=true,
   captionpos=b,
   keepspaces=true,
-  numbers=left,
-  numbersep=5pt,
-  numberstyle=\tiny\color{gray},
+  columns=fullflexible,
+  numbers=none,
   showspaces=false,
   showstringspaces=false,
   showtabs=false,
@@ -62,7 +64,8 @@
   frame=single,
   framerule=0.5pt,
   rulecolor=\color{gray},
-  backgroundcolor=\color{gray!5}
+  backgroundcolor=\color{gray!5},
+  upquote=true
 }
 
 % Hyperref setup
@@ -145,6 +148,7 @@
 \include{appendices/appendix_f}
 \include{appendices/appendix_g}
 \include{appendices/appendix_h}
+\include{appendices/appendix_i}
 
 \backmatter%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \include{backmatter/glossary}
