@@ -4,8 +4,8 @@
 \begin{figure}[htbp]
 \centering
 \begin{tikzpicture}[
-    node distance=1.2cm and 1.8cm,
-    box/.style={rectangle, draw, rounded corners, minimum width=2.4cm, minimum height=1cm, align=center, font=\small},
+    node distance=1.2cm and 1.5cm,
+    box/.style={rectangle, draw, rounded corners, minimum width=2.2cm, minimum height=1cm, align=center, font=\small},
     arrow/.style={->, thick, >=stealth},
     label/.style={font=\footnotesize\itshape, text=gray}
 ]
@@ -15,40 +15,40 @@
 \node[box, fill=green!10, right=of request] (tokenizer) {Tokenizer};
 \node[box, fill=orange!10, right=of tokenizer] (forward) {Forward\\Pass};
 
-% Bottom row: Output generation (reversed order for flow)
+% Bottom row: Output generation
 \node[box, fill=purple!10, below=of forward] (kvcache) {KV Cache\\Manager};
-\node[box, fill=red!10, left=of kvcache] (sampler) {Sampler};
-\node[box, fill=blue!10, left=of sampler] (response) {Response\\Streamer};
+\node[box, fill=red!10, below=of tokenizer] (sampler) {Sampler};
+\node[box, fill=blue!10, below=of request] (response) {Response\\Streamer};
 
 % Top row arrows
 \draw[arrow] (request) -- (tokenizer);
 \draw[arrow] (tokenizer) -- (forward);
 
-% Vertical arrow down
+% Down and across
 \draw[arrow] (forward) -- (kvcache);
-
-% Bottom row arrows (right to left)
 \draw[arrow] (kvcache) -- (sampler);
 \draw[arrow] (sampler) -- (response);
 
-% Loop back for autoregressive generation
-\draw[arrow, dashed] (sampler.north) -- ++(0,0.4) -| node[pos=0.75, above, label] {next token} (forward.north);
+% Loop back for autoregressive generation (curved path on the right side)
+\draw[arrow, dashed, rounded corners=8pt]
+    (kvcache.east) -- ++(0.8,0) -- ++(0,1.2) -- ++(-0.8,0) -- (forward.east);
+\node[label, anchor=west] at ($(kvcache.east) + (0.9, 0.6)$) {next token};
 
 % Input/Output labels
-\node[left=0.6cm of request, font=\small] (input) {``Hello''};
-\node[left=0.6cm of response, font=\small] (output) {``Hi!''};
+\node[left=0.5cm of request, font=\small] (input) {``Hello''};
+\node[left=0.5cm of response, font=\small] (output) {``Hi!''};
 \draw[arrow] (input) -- (request);
 \draw[arrow] (response) -- (output);
 
 % Component labels
-\node[above=0.2cm of request, label] {API/Queue};
-\node[above=0.2cm of tokenizer, label] {Text $\rightarrow$ IDs};
-\node[above=0.2cm of forward, label] {GPU Compute};
-\node[below=0.2cm of kvcache, label] {Memory Mgmt};
-\node[below=0.2cm of sampler, label] {Token Select};
-\node[below=0.2cm of response, label] {SSE Stream};
+\node[above=0.15cm of request, label] {API/Queue};
+\node[above=0.15cm of tokenizer, label] {Text $\rightarrow$ IDs};
+\node[above=0.15cm of forward, label] {GPU Compute};
+\node[below=0.15cm of kvcache, label] {Memory Mgmt};
+\node[below=0.15cm of sampler, label] {Token Select};
+\node[below=0.15cm of response, label] {SSE Stream};
 
 \end{tikzpicture}
-\caption{Inference engine pipeline. Requests flow through tokenization and the forward pass (top row), then through KV cache management and sampling (bottom row). The dashed arrow shows the autoregressive loop where each generated token feeds back for the next forward pass.}
+\caption{Inference engine pipeline. Requests flow through tokenization and the forward pass (top row), then through KV cache management and sampling (bottom row). The dashed arrow shows the autoregressive loop---each generated token feeds back through the forward pass until generation completes.}
 \label{fig:inference-pipeline}
 \end{figure}

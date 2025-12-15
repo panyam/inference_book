@@ -1,0 +1,47 @@
+% Diagram: Hardware Optimizations Overview
+% Shows key optimization techniques for inference
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    node distance=0.8cm,
+    optbox/.style={rectangle, draw, rounded corners, minimum width=3.5cm, minimum height=1.2cm, align=center, font=\small},
+    benefit/.style={font=\tiny, text=green!60!black},
+    label/.style={font=\footnotesize},
+    arrow/.style={->, thick, >=stealth}
+]
+
+% Central node
+\node[optbox, fill=gray!20, minimum width=4cm, minimum height=1.5cm] (center) {\textbf{Hardware}\\Optimizations};
+
+% Optimization nodes arranged around center
+\node[optbox, fill=blue!15, above left=1.5cm and 0.5cm of center] (flash) {FlashAttention\\{\tiny Reorder computation}};
+\node[benefit, below=0.1cm of flash] {2-4x attention speedup};
+
+\node[optbox, fill=green!15, above right=1.5cm and 0.5cm of center] (quant) {Quantization\\{\tiny INT8/INT4 compute}};
+\node[benefit, below=0.1cm of quant] {2-4x memory reduction};
+
+\node[optbox, fill=orange!15, below left=1.5cm and 0.5cm of center] (fusion) {Kernel Fusion\\{\tiny Combine operations}};
+\node[benefit, below=0.1cm of fusion] {Reduce memory transfers};
+
+\node[optbox, fill=purple!15, below right=1.5cm and 0.5cm of center] (spec) {Speculative\\Decoding\\{\tiny Draft + verify}};
+\node[benefit, below=0.1cm of spec] {2-3x decode speedup};
+
+\node[optbox, fill=red!15, left=2.5cm of center] (tensor) {Tensor\\Parallelism\\{\tiny Split across GPUs}};
+\node[benefit, below=0.1cm of tensor] {Run larger models};
+
+\node[optbox, fill=cyan!15, right=2.5cm of center] (prefix) {Prefix\\Caching\\{\tiny Share common prefixes}};
+\node[benefit, below=0.1cm of prefix] {Reduce redundant compute};
+
+% Arrows to center
+\draw[arrow, blue!50] (flash) -- (center);
+\draw[arrow, green!50] (quant) -- (center);
+\draw[arrow, orange!50] (fusion) -- (center);
+\draw[arrow, purple!50] (spec) -- (center);
+\draw[arrow, red!50] (tensor) -- (center);
+\draw[arrow, cyan!50] (prefix) -- (center);
+
+\end{tikzpicture}
+\caption{Key hardware optimizations for LLM inference. Each technique addresses a different bottleneck: FlashAttention reduces memory bandwidth for attention, quantization shrinks model size, kernel fusion minimizes memory transfers, speculative decoding accelerates token generation, tensor parallelism enables larger models, and prefix caching eliminates redundant computation.}
+\label{fig:hardware-optimizations}
+\end{figure}

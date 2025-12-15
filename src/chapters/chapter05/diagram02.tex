@@ -1,0 +1,64 @@
+% Diagram: Static vs Continuous Batching
+% Shows how requests are processed differently in each approach
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    node distance=0.3cm,
+    reqbox/.style={rectangle, draw, minimum width=0.4cm, minimum height=0.6cm, font=\tiny},
+    timeblock/.style={rectangle, draw, minimum height=0.6cm, font=\tiny},
+    label/.style={font=\footnotesize},
+    timelabel/.style={font=\tiny, text=gray}
+]
+
+% === STATIC BATCHING (top) ===
+\node[label, anchor=west] at (-1, 2.5) {\textbf{Static Batching}};
+
+% Time axis
+\draw[->, thick] (0, 1.8) -- (10, 1.8) node[right, timelabel] {time};
+
+% Batch 1 - all requests start and end together
+\node[reqbox, fill=blue!30, minimum width=3cm] at (1.5, 2.3) {Req A (short)};
+\node[reqbox, fill=green!30, minimum width=3cm] at (1.5, 2.9) {Req B (medium)};
+\node[reqbox, fill=red!30, minimum width=3cm] at (1.5, 3.5) {Req C (long)};
+
+% Wasted time indicators
+\draw[pattern=north east lines, pattern color=gray!50] (0.8, 2.0) rectangle (1.5, 2.6);
+\draw[pattern=north east lines, pattern color=gray!50] (2.0, 2.0) rectangle (3.0, 2.6);
+\draw[pattern=north east lines, pattern color=gray!50] (1.5, 2.6) rectangle (3.0, 3.2);
+
+% Batch 2
+\node[reqbox, fill=orange!30, minimum width=2cm] at (4.5, 2.3) {Req D};
+\node[reqbox, fill=purple!30, minimum width=2cm] at (4.5, 2.9) {Req E};
+
+% Labels
+\node[timelabel] at (1.5, 1.5) {Batch 1};
+\node[timelabel] at (4.5, 1.5) {Batch 2};
+\node[timelabel, text=red] at (6.5, 2.5) {GPU idle};
+\node[timelabel, anchor=west] at (7, 3) {waiting for};
+\node[timelabel, anchor=west] at (7, 2.6) {slowest request};
+
+% === CONTINUOUS BATCHING (bottom) ===
+\node[label, anchor=west] at (-1, -0.5) {\textbf{Continuous Batching}};
+
+% Time axis
+\draw[->, thick] (0, -1.2) -- (10, -1.2) node[right, timelabel] {time};
+
+% Requests flow continuously - staggered starts and ends
+\node[reqbox, fill=blue!30, minimum width=1.5cm] at (0.75, -0.7) {A};
+\node[reqbox, fill=green!30, minimum width=2.5cm] at (1.25, -0.1) {B};
+\node[reqbox, fill=red!30, minimum width=4cm] at (2, 0.5) {C};
+\node[reqbox, fill=orange!30, minimum width=2cm] at (2.5, -0.7) {D};
+\node[reqbox, fill=purple!30, minimum width=1.5cm] at (4.25, -0.1) {E};
+\node[reqbox, fill=cyan!30, minimum width=2cm] at (4.5, -0.7) {F};
+\node[reqbox, fill=yellow!30, minimum width=1.5cm] at (5.25, 0.5) {G};
+\node[reqbox, fill=pink!30, minimum width=2.5cm] at (6.25, -0.1) {H};
+
+% Annotation
+\draw[<->, thick, green!60!black] (0, -1.8) -- (6, -1.8);
+\node[timelabel, green!60!black] at (3, -2.1) {Same time period, 2x more requests};
+
+\end{tikzpicture}
+\caption{Static vs continuous batching. In static batching (top), all requests in a batch must complete before new ones start, leaving GPU idle while waiting for the slowest request. Continuous batching (bottom) allows requests to enter and exit independently, keeping the GPU fully utilized.}
+\label{fig:batching-comparison}
+\end{figure}

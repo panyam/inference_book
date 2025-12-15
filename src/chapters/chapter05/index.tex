@@ -89,6 +89,8 @@ Consider a batch of 8 requests where generation lengths range from 50 to 500 tok
 Production engines like vLLM and SGLang achieve 2-4x higher throughput through continuous batching alone.
 \end{svgraybox}
 
+\input{chapters/chapter05/diagram02}
+
 \subsection{Memory Management}
 \label{subsec:memory-management}
 
@@ -112,6 +114,8 @@ Benefits of paged attention:
 
 This innovation enabled 2-4x throughput improvements and has been adopted by most production engines.
 
+\input{chapters/chapter05/diagram03}
+
 \subsection{Scheduling and Fairness}
 \label{subsec:scheduling}
 
@@ -126,6 +130,8 @@ With continuous batching and paged attention, the engine must decide: which requ
 
 \item[Fairness] Without care, long-running requests can starve. Round-robin or weighted scheduling ensures progress for all requests.
 \end{description}
+
+\input{chapters/chapter05/diagram04}
 
 \subsection{Hardware Optimization}
 \label{subsec:hardware-optimization}
@@ -143,6 +149,8 @@ Raw transformer math is straightforward, but efficient execution requires hardwa
 
 \item[Speculative Decoding] Use a small ``draft'' model to predict multiple tokens, then verify with the large model~\cite{leviathan2023speculative}. Can improve throughput when draft accuracy is high.
 \end{description}
+
+\input{chapters/chapter05/diagram05}
 
 \subsection{API Design}
 \label{subsec:api-design}
