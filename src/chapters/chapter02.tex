@@ -369,6 +369,83 @@ Imagine you're writing ``The cat sat on the \_\_\_'' and need to predict the nex
 
 Crucially, in decoder-only models, each token can only attend to previous tokens (and itself). Token 5 can look at tokens 1--5, but not tokens 6 onward. This ``causal masking'' ensures the model can't cheat by looking at future tokens during training.
 
+\paragraph{How Causal Masking Works}
+
+The attention mechanism computes similarity scores between all token pairs, then applies softmax to get weights. To prevent attending to future tokens, we add a \emph{mask} before the softmax:
+
+\begin{equation}
+\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}} + M\right) V
+\end{equation}
+
+Where $M$ is a triangular mask matrix:
+\[
+M = \begin{pmatrix}
+0 & -\infty & -\infty & -\infty \\
+0 & 0 & -\infty & -\infty \\
+0 & 0 & 0 & -\infty \\
+0 & 0 & 0 & 0
+\end{pmatrix}
+\]
+
+The $-\infty$ values become 0 after softmax (since $e^{-\infty} = 0$), effectively zeroing out attention to future positions. Token 1 can only attend to itself; token 2 can attend to tokens 1--2; token $n$ can attend to tokens 1--$n$.
+
+% Diagram: Causal Mask
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=0.6]
+% Grid
+\draw[step=1cm, gray, very thin] (0,0) grid (5,5);
+
+% Colored cells (lower triangle = can attend)
+\foreach \x in {0,...,4} {
+    \foreach \y in {0,...,4} {
+        \pgfmathtruncatemacro{\sum}{\x + \y}
+        \ifnum \y < 5
+            \ifnum \x > \y
+                \fill[green!30] (\x, 4-\y) rectangle (\x+1, 5-\y);
+            \else
+                \fill[red!20] (\x, 4-\y) rectangle (\x+1, 5-\y);
+            \fi
+        \fi
+    }
+}
+
+% Fix the diagonal and below
+\fill[green!30] (0,4) rectangle (1,5);
+\fill[green!30] (0,3) rectangle (1,4);
+\fill[green!30] (1,3) rectangle (2,4);
+\fill[green!30] (0,2) rectangle (1,3);
+\fill[green!30] (1,2) rectangle (2,3);
+\fill[green!30] (2,2) rectangle (3,3);
+\fill[green!30] (0,1) rectangle (1,2);
+\fill[green!30] (1,1) rectangle (2,2);
+\fill[green!30] (2,1) rectangle (3,2);
+\fill[green!30] (3,1) rectangle (4,2);
+\fill[green!30] (0,0) rectangle (1,1);
+\fill[green!30] (1,0) rectangle (2,1);
+\fill[green!30] (2,0) rectangle (3,1);
+\fill[green!30] (3,0) rectangle (4,1);
+\fill[green!30] (4,0) rectangle (5,1);
+
+% Labels
+\node at (2.5, 5.5) {\small Key position (attending to)};
+\node[rotate=90] at (-0.7, 2.5) {\small Query position};
+
+% Token labels
+\foreach \i in {1,...,5} {
+    \node at (\i-0.5, -0.3) {\tiny $t_{\i}$};
+    \node at (-0.3, 5.5-\i) {\tiny $t_{\i}$};
+}
+
+% Legend
+\node[right] at (6, 3.5) {\small \colorbox{green!30}{Can attend}};
+\node[right] at (6, 2.5) {\small \colorbox{red!20}{Masked ($-\infty$)}};
+
+\end{tikzpicture}
+\caption{Causal attention mask: each token (row) can only attend to itself and earlier tokens (columns).}
+\label{fig:causal-mask}
+\end{figure}
+
 \subsection{Multi-Head Attention}
 \label{subsec:multi-head-attention}
 
@@ -829,6 +906,8 @@ Where:
 \end{itemize}
 \end{svgraybox}
 
+\calclink{/c/3/kv}{l=32&h=32&d=128&c=4096&b=2&n=1}{Try the interactive KV Cache calculator}
+
 Let's calculate for a Llama 3.2 7B model at 4096 context length:
 \begin{itemize}
 \item Layers: 32
@@ -1205,8 +1284,6 @@ SSMs are an active research area. As of early 2025, transformers remain dominant
 \section{Summary}
 \label{sec:ch02-summary}
 % =============================================================================
-
-% TODO: Write summary connecting to Chapter 3
 
 This chapter provided the conceptual foundation for understanding LLM inference. We traced the evolution from sequential RNNs to parallel transformers, explored the attention mechanism that allows tokens to communicate, and walked through the inference lifecycle from prompt tokenization through autoregressive generation.
 

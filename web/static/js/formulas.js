@@ -387,6 +387,225 @@ const FORMULAS = {
         ]
       };
     }
+  },
+
+  // Chapter 2, Section 2.5 - Model Parameter Calculator
+  params: {
+    id: 'params',
+    title: 'Model Parameter Calculator',
+    chapter: 2,
+    section: '2.5',
+    description: 'Estimate total parameters from model architecture dimensions',
+    latex: '\\text{Total} \\approx \\text{Embedding} + L \\times (\\text{Attention} + \\text{FFN})',
+
+    inputs: [
+      {
+        id: 'layers',
+        label: 'Layers',
+        type: 'number',
+        default: 32,
+        min: 1,
+        max: 200,
+        hint: 'Number of transformer layers'
+      },
+      {
+        id: 'hidden',
+        label: 'Hidden Dimension',
+        type: 'number',
+        default: 4096,
+        min: 256,
+        max: 16384,
+        step: 256,
+        hint: 'Model hidden size (d_model)'
+      },
+      {
+        id: 'heads',
+        label: 'Attention Heads',
+        type: 'number',
+        default: 32,
+        min: 1,
+        max: 128,
+        hint: 'Number of attention heads'
+      },
+      {
+        id: 'vocab',
+        label: 'Vocabulary Size',
+        type: 'number',
+        default: 32000,
+        min: 1000,
+        max: 200000,
+        step: 1000,
+        hint: 'Number of tokens in vocabulary'
+      },
+      {
+        id: 'ffn_mult',
+        label: 'FFN Multiplier',
+        type: 'select',
+        default: 4,
+        options: [
+          { value: 4, label: '4x (standard)' },
+          { value: 2.67, label: '2.67x (SwiGLU effective)' },
+          { value: 8, label: '8x (large FFN)' }
+        ],
+        hint: 'FFN intermediate size / hidden size'
+      },
+      {
+        id: 'ffn_type',
+        label: 'FFN Type',
+        type: 'select',
+        default: 'swiglu',
+        options: [
+          { value: 'standard', label: 'Standard (2 matrices)' },
+          { value: 'swiglu', label: 'SwiGLU (3 matrices)' }
+        ],
+        hint: 'FFN architecture type'
+      }
+    ],
+
+    presets: [
+      { label: 'Llama 7B', values: { layers: 32, hidden: 4096, heads: 32, vocab: 32000, ffn_mult: 2.67, ffn_type: 'swiglu' } },
+      { label: 'Llama 13B', values: { layers: 40, hidden: 5120, heads: 40, vocab: 32000, ffn_mult: 2.67, ffn_type: 'swiglu' } },
+      { label: 'Llama 70B', values: { layers: 80, hidden: 8192, heads: 64, vocab: 32000, ffn_mult: 2.67, ffn_type: 'swiglu' } },
+      { label: 'GPT-2 Small', values: { layers: 12, hidden: 768, heads: 12, vocab: 50257, ffn_mult: 4, ffn_type: 'standard' } }
+    ],
+
+    calculate(inputs) {
+      const { layers, hidden, heads, vocab, ffn_mult, ffn_type } = inputs;
+      const headDim = hidden / heads;
+
+      // Embedding parameters
+      const embedding = vocab * hidden;
+
+      // Attention parameters per layer: Q, K, V, O projections
+      // Each is hidden x hidden (or hidden x (heads * head_dim))
+      const attnPerLayer = 4 * hidden * hidden;
+
+      // FFN parameters per layer
+      let ffnPerLayer;
+      const ffnIntermediate = hidden * ffn_mult;
+      if (ffn_type === 'swiglu') {
+        // SwiGLU has 3 matrices: up, gate, down
+        ffnPerLayer = 3 * hidden * ffnIntermediate;
+      } else {
+        // Standard FFN has 2 matrices: up, down
+        ffnPerLayer = 2 * hidden * ffnIntermediate;
+      }
+
+      // Layer norm parameters (small but included for accuracy)
+      const layerNormPerLayer = 4 * hidden; // 2 layer norms with weight + bias each
+
+      // Total per layer
+      const perLayer = attnPerLayer + ffnPerLayer + layerNormPerLayer;
+
+      // Output projection (often tied with embedding)
+      const output = vocab * hidden;
+
+      // Total
+      const total = embedding + (layers * perLayer) + output;
+      const totalB = total / 1e9;
+
+      return {
+        result: totalB,
+        unit: 'B params',
+        breakdown: [
+          { label: 'Embedding', value: `${(embedding / 1e6).toFixed(0)}M` },
+          { label: 'Attention/layer', value: `${(attnPerLayer / 1e6).toFixed(0)}M` },
+          { label: 'FFN/layer', value: `${(ffnPerLayer / 1e6).toFixed(0)}M` },
+          { label: 'Per layer total', value: `${(perLayer / 1e6).toFixed(0)}M` },
+          { label: `${layers} layers`, value: `${((layers * perLayer) / 1e9).toFixed(2)}B` },
+          { label: 'Output projection', value: `${(output / 1e6).toFixed(0)}M` },
+          { label: 'Total', value: `${totalB.toFixed(2)}B` }
+        ]
+      };
+    }
+  },
+
+  // Chapter 2, Section 2.4.3 - FFN Parameters Calculator
+  ffn: {
+    id: 'ffn',
+    title: 'FFN Parameters Calculator',
+    chapter: 2,
+    section: '2.4.3',
+    description: 'Calculate feed-forward network parameters per layer',
+    latex: '\\text{FFN params} = k \\times d \\times d_{ff} \\text{ where } k=2 \\text{ (standard) or } 3 \\text{ (SwiGLU)}',
+
+    inputs: [
+      {
+        id: 'hidden',
+        label: 'Hidden Dimension',
+        unit: 'd',
+        type: 'number',
+        default: 4096,
+        min: 256,
+        max: 16384,
+        step: 256,
+        hint: 'Model hidden size'
+      },
+      {
+        id: 'expansion',
+        label: 'Expansion Factor',
+        type: 'select',
+        default: 4,
+        options: [
+          { value: 4, label: '4x (standard)' },
+          { value: 2.67, label: '2.67x (Llama-style)' },
+          { value: 8, label: '8x (large)' }
+        ],
+        hint: 'FFN intermediate / hidden'
+      },
+      {
+        id: 'ffn_type',
+        label: 'FFN Type',
+        type: 'select',
+        default: 'swiglu',
+        options: [
+          { value: 'standard', label: 'Standard (2 matrices)' },
+          { value: 'swiglu', label: 'SwiGLU (3 matrices)' }
+        ]
+      },
+      {
+        id: 'layers',
+        label: 'Number of Layers',
+        type: 'number',
+        default: 32,
+        min: 1,
+        max: 200,
+        hint: 'To calculate total FFN params'
+      }
+    ],
+
+    presets: [
+      { label: '7B Style', values: { hidden: 4096, expansion: 2.67, ffn_type: 'swiglu', layers: 32 } },
+      { label: '13B Style', values: { hidden: 5120, expansion: 2.67, ffn_type: 'swiglu', layers: 40 } },
+      { label: '70B Style', values: { hidden: 8192, expansion: 2.67, ffn_type: 'swiglu', layers: 80 } },
+      { label: 'GPT-2 Style', values: { hidden: 768, expansion: 4, ffn_type: 'standard', layers: 12 } }
+    ],
+
+    calculate(inputs) {
+      const { hidden, expansion, ffn_type, layers } = inputs;
+
+      const intermediate = Math.round(hidden * expansion);
+      const matrices = ffn_type === 'swiglu' ? 3 : 2;
+      const paramsPerLayer = matrices * hidden * intermediate;
+      const totalParams = paramsPerLayer * layers;
+
+      // Classic formula representation
+      const dSquared = hidden * hidden;
+      const effectiveMult = (paramsPerLayer / dSquared);
+
+      return {
+        result: (paramsPerLayer / 1e6),
+        unit: 'M/layer',
+        breakdown: [
+          { label: 'Hidden dim (d)', value: hidden.toLocaleString() },
+          { label: 'Intermediate dim', value: intermediate.toLocaleString() },
+          { label: 'Matrices', value: `${matrices} (${ffn_type})` },
+          { label: 'Per layer', value: `${(paramsPerLayer / 1e6).toFixed(0)}M` },
+          { label: `As d² multiple`, value: `${effectiveMult.toFixed(1)}d²` },
+          { label: `Total (${layers} layers)`, value: `${(totalParams / 1e9).toFixed(2)}B` }
+        ]
+      };
+    }
   }
 };
 

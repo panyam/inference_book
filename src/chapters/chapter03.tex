@@ -40,9 +40,7 @@ Half precision (FP16 or BF16) cuts this in half: 2 bytes per parameter, so 14 GB
 grade GPU (like the RTX 4090 with 24 GB) with room to spare, but will limit any real usage when you account for other
 memory needs.
 
-Quantization reduces precision further. At 4-bit precision (INT4), each parameter uses only 0.5 bytes, bringing our 7B model down to 3.5 GB. This is why quantized models run on laptops and modest GPUs---the memory reduction is dramatic:
-
-\todo{Explain what precisions are and why it is needed - Quantization etc}
+Quantization reduces precision further. At 4-bit precision (INT4), each parameter uses only 0.5 bytes, bringing our 7B model down to 3.5 GB. This is why quantized models run on laptops and modest GPUs---the memory reduction is dramatic. Section~\ref{subsec:precision} covers precision formats in detail, and Chapter~\ref{ch:models} explores quantization methods.
 
 \begin{table}[htbp]
 \centering
@@ -66,13 +64,7 @@ These numbers represent minimums---the weights alone, with nothing else. Actual 
 \subsection{The KV Cache}
 \label{subsec:kv-cache}
 
-The KV cache is the second major memory consumer, and unlike weights, it grows during inference. Understanding it explains why long conversations consume more memory than short ones.
-
-During autoregressive generation, the model generates one token at a time. For each new token, it must "attend" to all previous tokens---the attention mechanism needs to compute relationships between the new token and everything that came before. Without caching, this would require reprocessing the entire context for every generated token, making generation quadratically slower.
-
-The KV cache stores the key and value vectors computed during attention. Once computed, these don't change, so caching them avoids redundant computation. The trade-off: memory consumption that grows linearly with context length.
-
-\todo{Is there a dynamic programming relation here?}
+The KV cache is the second major memory consumer, and unlike weights, it grows during inference. As we learned in Chapter~\ref{ch:how-llms-work}, the KV cache trades memory for compute by storing key and value vectors from previous tokens. Here we focus on quantifying that memory cost.
 
 The KV cache size depends on model architecture:
 
@@ -101,10 +93,7 @@ For a typical 7B model (32 layers, 32 heads, 128 dimensions per head) at FP16:
 
 At 4096 context tokens: $\sim$2 GB. At 32K context: $\sim$16 GB. At 128K context: $\sim$64 GB---potentially exceeding the weight memory itself.
 
-This is why long-context inference is memory-intensive. A 7B model that fits comfortably in 8 GB VRAM at 4K context may require 24 GB at 32K context. Grouped Query Attention (GQA), used in newer models like Llama 3 and Qwen 2.5, reduces KV cache size by sharing key-value heads, typically by 4--8x.
-
-\todo{May be time to explain some of the architectures here - eg Long Context Inference, GQA etc - more importantly how
-it might affect how GPUs are used}
+This is why long-context inference is memory-intensive. A 7B model that fits comfortably in 8 GB VRAM at 4K context may require 24 GB at 32K context. Grouped Query Attention (GQA), used in newer models like Llama 3 and Qwen 2.5, reduces KV cache size by sharing key-value heads, typically by 4--8x. When selecting models in Chapter~\ref{ch:models}, we'll see how GQA affects practical deployment choices.
 
 \subsection{Activation and Working Memory}
 \label{subsec:activation-memory}
@@ -161,9 +150,7 @@ Where overhead is typically 10--20\% additional memory.
 \subsection{Precision and Memory}
 \label{subsec:precision}
 
-Numerical precision determines bytes per parameter. Lower precision means smaller models but potentially reduced quality. The trade-off is usually worthwhile for inference.
-
-\todo{Also talk about why this tradeoff is worthwhile and ways it might be compensated for}
+Numerical precision determines bytes per parameter. Lower precision means smaller models but potentially reduced quality. The trade-off is usually worthwhile for inference because: (1) inference doesn't accumulate errors like training does, (2) modern quantization methods preserve critical weights at higher precision, and (3) the quality loss is often imperceptible for practical applications.
 
 \begin{table}[htbp]
 \centering
@@ -735,7 +722,7 @@ If you're deploying on GCP with JAX models, see Appendix~\ref{ch:appendix-tpu} f
 
 % =============================================================================
 \section{Summary}
-\label{sec:ch02-summary}
+\label{sec:ch03-summary}
 % =============================================================================
 
 This chapter established the hardware foundations for self-hosted inference. We began with transformer memory architecture---understanding that model weights, KV cache, and activation memory compete for finite GPU resources. The VRAM calculation framework lets you predict memory requirements for any model before attempting to run it.
@@ -746,7 +733,7 @@ The hardware comparison revealed that consumer GPUs (RTX 4090) offer exceptional
 
 Finally, we tackled the economics: buy vs rent depends primarily on utilization. Above 50\% utilization, owning hardware typically pays off within a year. Below 30\%, renting remains more cost-effective. Power and cooling add 10--15\% to operating costs and deserve consideration in any deployment.
 
-With this hardware foundation, Chapter~\ref{ch:inference-engines} introduces the software that puts this hardware to work: inference engines like llama.cpp, vLLM, and TensorRT-LLM.
+With hardware requirements understood, the next question is: which models fit your hardware? Chapter~\ref{ch:models} covers model selection---navigating the landscape of available models, understanding format differences (GGUF, GPTQ, AWQ), and choosing quantization levels that balance quality against your VRAM constraints.
 
 \begin{important}{Key Takeaways}
 \begin{itemize}
