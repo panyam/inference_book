@@ -1,6 +1,6 @@
 # Inference Book - Interactive Calculators
 
-Interactive web-based calculators for the formulas in "Self-Hosted AI Inference" book.
+Interactive web-based calculators for the formulas in the book.
 
 ## Features
 
@@ -11,6 +11,13 @@ Interactive web-based calculators for the formulas in "Self-Hosted AI Inference"
 - **Responsive design** - Works on mobile and desktop
 
 ## Calculators
+
+### Chapter 2: How LLMs Work
+
+| Calculator | URL | Description |
+|------------|-----|-------------|
+| Model Parameters | `/c/2/params/` | Estimate total parameters from architecture |
+| FFN Parameters | `/c/2/ffn/` | Calculate FFN parameters per layer |
 
 ### Chapter 3: Hardware Fundamentals
 
@@ -40,6 +47,20 @@ go run main.go
 ```
 
 ## Query Parameters
+
+### Model Parameters (`/c/2/params/`)
+- `layers` - Number of transformer layers
+- `hidden` - Hidden dimension (d_model)
+- `heads` - Number of attention heads
+- `vocab` - Vocabulary size
+- `ffn_mult` - FFN expansion multiplier (4, 2.67, 8)
+- `ffn_type` - FFN type (standard, swiglu)
+
+### FFN Parameters (`/c/2/ffn/`)
+- `hidden` - Hidden dimension
+- `expansion` - Expansion factor (4, 2.67, 8)
+- `ffn_type` - FFN type (standard, swiglu)
+- `layers` - Number of layers
 
 ### Weight Memory (`/c/3/vram/`)
 - `p` - Parameters in billions (default: 7)

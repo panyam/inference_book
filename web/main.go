@@ -48,7 +48,7 @@ func main() {
 		Handler: withLogger(router),
 		Addr:    *addr,
 	}
-	log.Printf("Inference Book Calculators serving on %s", *addr)
+	log.Printf("'Inference is all you need' Book Calculators serving on %s", *addr)
 	log.Fatal(srv.ListenAndServe())
 }
 
