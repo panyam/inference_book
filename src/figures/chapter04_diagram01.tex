@@ -1,0 +1,33 @@
+% Diagram: Model File Structure
+% Used in: Chapter 4, Section 4.1.1 (What a Model File Contains)
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    node distance=0.3cm,
+    block/.style={rectangle, draw, minimum width=6cm, minimum height=0.7cm, font=\small},
+    header/.style={block, fill=blue!20},
+    meta/.style={block, fill=green!20},
+    tensor/.style={block, fill=orange!20},
+    data/.style={block, fill=gray!10}
+]
+
+% File structure
+\node[header] (hdr) {Header (magic bytes, version, format info)};
+\node[meta, below=of hdr] (idx) {Tensor Index (names, shapes, offsets, dtypes)};
+\node[meta, below=of idx] (arch) {Architecture Metadata (layers, heads, dims)};
+\node[tensor, below=of arch, minimum height=1.5cm] (t1) {Tensor Data: embed\_tokens [vocab $\times$ dim]};
+\node[tensor, below=of t1, minimum height=1cm] (t2) {Tensor Data: layer.0.attention.wq [dim $\times$ dim]};
+\node[data, below=of t2] (dots) {...hundreds more tensors...};
+\node[tensor, below=of dots, minimum height=1cm] (tn) {Tensor Data: lm\_head [dim $\times$ vocab]};
+
+% Arrows showing offsets
+\draw[<->, thick, red] (8, -0.35) -- (8, -4.8) node[midway, right, font=\scriptsize] {Offset-based access};
+
+% Labels
+\node[left=0.5cm of hdr, font=\scriptsize, align=right] {Fixed\\size};
+\node[left=0.5cm of t1, font=\scriptsize, align=right] {Bulk of\\file size};
+
+\end{tikzpicture}
+\caption{Anatomy of a model file: metadata enables direct access to tensor data via offsets.}
+\label{fig:model-file-structure}
+\end{figure}

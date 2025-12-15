@@ -1,0 +1,48 @@
+% Diagram: Loading Pipeline Comparison
+% Used in: Chapter 4, Section 4.1.2 (Design Principles for Model Formats)
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    node distance=0.4cm,
+    pipelinestep/.style={rectangle, draw, rounded corners, minimum width=2cm, minimum height=0.6cm, font=\scriptsize},
+    good/.style={pipelinestep, fill=green!20},
+    bad/.style={pipelinestep, fill=red!20},
+    neutral/.style={pipelinestep, fill=gray!10}
+]
+
+% Good path (top)
+\node[neutral] (disk1) {Disk};
+\node[good, right=of disk1] (mmap) {mmap};
+\node[good, right=of mmap] (pin) {Pinned RAM};
+\node[good, right=of pin] (gpu1) {GPU VRAM};
+\node[above=0.3cm of mmap, font=\scriptsize\bfseries] {Efficient (mmap-friendly format)};
+
+% Arrows
+\draw[->, thick] (disk1) -- (mmap);
+\draw[->, thick] (mmap) -- (pin);
+\draw[->, thick] (pin) -- (gpu1);
+
+% Bad path (bottom)
+\node[neutral, below=1.5cm of disk1] (disk2) {Disk};
+\node[bad, right=of disk2] (read) {Read to Buffer};
+\node[bad, right=of read] (decomp) {Decompress};
+\node[bad, right=of decomp] (convert) {Convert};
+\node[neutral, right=of convert] (gpu2) {GPU VRAM};
+\node[above=0.3cm of decomp, font=\scriptsize\bfseries] {Inefficient (requires transformation)};
+
+% Arrows
+\draw[->, thick] (disk2) -- (read);
+\draw[->, thick] (read) -- (decomp);
+\draw[->, thick] (decomp) -- (convert);
+\draw[->, thick] (convert) -- (gpu2);
+
+% Memory labels
+\node[below=0.1cm of mmap, font=\tiny] {Zero-copy};
+\node[below=0.1cm of read, font=\tiny] {+14GB};
+\node[below=0.1cm of decomp, font=\tiny] {+14GB};
+\node[below=0.1cm of convert, font=\tiny] {+14GB};
+
+\end{tikzpicture}
+\caption{Loading pipelines: mmap-friendly formats minimize memory copies and allocation.}
+\label{fig:loading-pipeline}
+\end{figure}
