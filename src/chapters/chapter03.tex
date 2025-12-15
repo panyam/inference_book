@@ -31,6 +31,8 @@ The formula is straightforward:
 \text{Weight Memory} = \text{Parameters} \times \text{Bytes per Parameter}
 \end{equation}
 
+\calclink{/c/3/vram}{}{Try the interactive Weight Memory calculator}
+
 At full precision (FP32), each parameter uses 4 bytes. A 7B model requires $7 \times 10^9 \times 4 = 28$ GB just for
 weights---more than most consumer GPUs offer.  This is why serving large models at FP32 for inference is very rare.
 
@@ -89,6 +91,8 @@ Where:
 \item Factor of 2 accounts for both keys and values
 \end{itemize}
 
+\calclink{/c/3/kv}{l=32&h=32&d=128&c=4096&b=2&n=1}{Try the interactive KV Cache calculator}
+
 For a typical 7B model (32 layers, 32 heads, 128 dimensions per head) at FP16:
 
 \begin{equation}
@@ -124,6 +128,8 @@ Practical VRAM planning requires a safety margin. CUDA maintains its own memory 
 \begin{equation}
 \text{Total VRAM} \approx (\text{Weights} + \text{KV Cache} + \text{Activations}) \times 1.15
 \end{equation}
+
+\calclink{/c/3/total}{p=7&q=0.5&c=4096&n=1}{Try the interactive Total VRAM calculator}
 
 If your calculations show 20 GB needed, plan for 23 GB to be safe. This matters when choosing between a 24 GB GPU that barely fits and a 48 GB GPU with comfortable headroom. The latter allows longer contexts, larger batches, or simply more reliable operation.
 
@@ -530,6 +536,8 @@ The break-even point determines when owning hardware becomes cheaper than rentin
 
 Where Monthly Operating Cost includes power, cooling, and amortized maintenance.
 \end{svgraybox}
+
+\calclink{/c/3/breakeven}{hw=2400&setup=0&rent=0.44&hours=720&power=0.15&watts=300}{Try the interactive Break-Even calculator}
 
 \paragraph{Worked Example: RTX 4090 for 24/7 Inference}
 

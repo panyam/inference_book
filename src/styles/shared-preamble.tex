@@ -88,3 +88,37 @@
 \emergencystretch=1em
 \hfuzz=2pt
 \vfuzz=2pt
+
+% QR code support for interactive calculator links
+\usepackage{qrcode}
+
+% Base URL for calculator site (change for production)
+\newcommand{\calcbaseurl}{https://inferbook.dev}
+
+% Calculator link with QR code
+% Usage: \calclink{/c/3/vram}{p=7&q=0.5}{Try the interactive calculator}
+% Args: #1 = path, #2 = query params (optional), #3 = link text
+\newcommand{\calclink}[3]{%
+  \begin{center}
+  \fbox{%
+    \begin{minipage}{0.85\textwidth}
+    \small
+    \begin{minipage}[c]{0.15\textwidth}
+      \centering
+      \qrcode[height=1.2cm]{\calcbaseurl#1\ifx&#2&\else?#2\fi}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}[c]{0.80\textwidth}
+      \textbf{#3}\\[2pt]
+      \url{\calcbaseurl#1\ifx&#2&\else?#2\fi}
+    \end{minipage}
+    \end{minipage}%
+  }
+  \end{center}
+}
+
+% Compact inline calculator link (no QR)
+% Usage: \calclinkshort{/c/3/vram}{p=7&q=0.5}
+\newcommand{\calclinkshort}[2]{%
+  \href{\calcbaseurl#1\ifx&#2&\else?#2\fi}{\small\texttt{\calcbaseurl#1}}%
+}
