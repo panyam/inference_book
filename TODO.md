@@ -127,8 +127,8 @@
 
 ### Chapter 2: How LLMs Work (NEW)
 
-**Status:** ⬜ Not Started
-**File:** `src/chapters/chapter02.tex` (to be created)
+**Status:** 🟢 First Draft Complete
+**File:** `src/chapters/chapter02/index.tex`
 
 **Learning Objectives:**
 - Understand transformer architecture at a systems level (not math)
@@ -487,8 +487,10 @@ Chapter 3 (Hardware) discusses VRAM, KV cache, and attention heads. This chapter
 
 ### Chapter 6: Building Control Plane v0.1 (was Chapter 5)
 
-**Status:** 🟡 Outline Created
-**File:** `src/chapters/chapter06.tex` (rename from chapter05.tex)
+**Status:** 🟢 First Draft Complete
+**File:** `src/chapters/chapter06/index.tex`
+
+**Note:** Chapter restructured to focus on concepts/architecture rather than Go tutorial. Points to `github.com/inference-book/inference-plane` for full implementation. Includes "Setting Up Your Lab Environment" section recommending cloud GPU providers.
 
 **Learning Objectives:**
 - Design a simple API gateway for inference
@@ -774,8 +776,8 @@ Chapter 3 (Hardware) discusses VRAM, KV cache, and attention heads. This chapter
 
 | Appendix | Title | Status | Priority | Notes |
 |----------|-------|--------|----------|-------|
-| A | Complete Control Plane Code | 🟡 | LOW | Reference implementation |
-| B | Hardware Specifications | 🟡 | MEDIUM | GPU spec sheets |
+| A | Control Plane Key Abstractions | 🟢 | LOW | Core interfaces reference |
+| B | GPU Cloud Providers Setup Guide | 🟢 | HIGH | RunPod, Lambda, Vast.ai, AWS, GCP |
 | C | Model Catalog | 🟡 | MEDIUM | Model recommendations by size |
 | D | API Reference | 🟡 | MEDIUM | OpenAPI spec |
 | E | Deployment Templates | 🟡 | MEDIUM | Docker, K8s, Terraform |
@@ -828,7 +830,7 @@ Chapter 3 (Hardware) discusses VRAM, KV cache, and attention heads. This chapter
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Repository setup | ⬜ | GitHub repo needed |
+| Repository setup | 🟡 | `github.com/inference-book/inference-plane` (referenced, needs creation) |
 | v0.1 implementation | ⬜ | Chapters 1-5 |
 | v0.2 implementation | ⬜ | Chapters 6-10 |
 | v0.3 implementation | ⬜ | Chapters 11-15 |

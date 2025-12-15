@@ -1,0 +1,54 @@
+% Diagram: Control Plane v0.1 Architecture
+% Shows the system components and data flow
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    node distance=1.5cm and 2cm,
+    component/.style={rectangle, draw, rounded corners, minimum width=2.5cm, minimum height=1.2cm, align=center, font=\small},
+    database/.style={cylinder, draw, shape border rotate=90, aspect=0.3, minimum height=1cm, minimum width=1.5cm, font=\small},
+    arrow/.style={->, thick, >=stealth},
+    label/.style={font=\footnotesize\itshape, text=gray}
+]
+
+% Client
+\node[component, fill=blue!10] (client) {Client\\Application};
+
+% Control Plane (main box)
+\node[component, fill=green!20, minimum width=6cm, minimum height=3cm, right=2cm of client] (cp) {};
+\node[font=\small\bfseries] at ($(cp.north) - (0, 0.3)$) {Control Plane v0.1};
+
+% Components inside control plane
+\node[component, fill=white, minimum width=1.8cm, minimum height=0.8cm] at ($(cp.west) + (1.3, 0.5)$) (api) {API\\Server};
+\node[component, fill=white, minimum width=1.8cm, minimum height=0.8cm] at ($(cp.east) - (1.3, 0.5)$) (backend) {Backend\\Proxy};
+\node[component, fill=white, minimum width=1.8cm, minimum height=0.8cm] at ($(cp.south) + (0, 0.6)$) (metrics) {Metrics};
+
+% Inference Engine
+\node[component, fill=orange!20, right=2cm of cp] (ollama) {Ollama\\(Inference)};
+
+% Observability stack
+\node[component, fill=purple!15, below=1.5cm of cp] (prometheus) {Prometheus};
+\node[component, fill=purple!15, right=1.5cm of prometheus] (grafana) {Grafana};
+
+% Arrows - main flow
+\draw[arrow] (client) -- node[above, label] {HTTP} (api);
+\draw[arrow] (api) -- (backend);
+\draw[arrow] (backend) -- node[above, label] {HTTP} (ollama);
+
+% Arrows - metrics flow
+\draw[arrow, dashed] (metrics) -- node[left, label] {scrape} (prometheus);
+\draw[arrow] (prometheus) -- node[above, label] {query} (grafana);
+
+% Port labels
+\node[label] at ($(client.east) + (0.5, -0.3)$) {:8080};
+\node[label] at ($(ollama.west) - (0.5, 0.3)$) {:11434};
+\node[label] at ($(prometheus.north) + (0, 0.2)$) {:9090};
+\node[label] at ($(grafana.north) + (0, 0.2)$) {:3000};
+
+% Response arrow
+\draw[arrow, dashed, blue!50] (ollama.south) -- ++(0, -0.5) -| node[pos=0.25, below, label] {response} (client.south);
+
+\end{tikzpicture}
+\caption{Control Plane v0.1 architecture. Clients send requests to the control plane's API server, which proxies to the Ollama backend. Prometheus scrapes metrics from the control plane, and Grafana visualizes them.}
+\label{fig:cp-v01-architecture}
+\end{figure}

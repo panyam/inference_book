@@ -1,45 +1,455 @@
 %%%%%%%%%%%%%%%%%%%%% appendix_b.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% Appendix B: Hardware Specifications Reference
+% Appendix B: GPU Cloud Providers Setup Guide
 %
 %%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Hardware Specifications Reference}
-\label{ch:appendix-hardware}
+\chapter{GPU Cloud Providers Setup Guide}
+\label{ch:appendix-gpu-providers}
 
-This appendix provides detailed specifications for GPUs commonly used in inference deployments.
-
-% =============================================================================
-\section{NVIDIA Consumer GPUs}
-\label{sec:consumer-gpus}
-% =============================================================================
-
-% TODO: Specs for RTX series
+This appendix provides step-by-step guides for provisioning GPU instances on popular cloud providers. From Chapter 6 onward, we recommend using cloud GPUs for a consistent experience across all readers.
 
 % =============================================================================
-\section{NVIDIA Professional GPUs}
-\label{sec:professional-gpus}
+\section{Choosing a Provider}
+\label{sec:choosing-provider}
 % =============================================================================
 
-% TODO: Specs for A100, H100, etc.
+Each provider has trade-offs in pricing, availability, and ease of use. Here's a quick comparison:
+
+\begin{center}
+\begin{tabular}{lllll}
+\toprule
+\textbf{Provider} & \textbf{Pricing} & \textbf{Ease of Use} & \textbf{Availability} & \textbf{Best For} \\
+\midrule
+RunPod & \$0.30-2.00/hr & Easy & Good & This book (default) \\
+Lambda Labs & \$0.50-2.50/hr & Easy & Variable & AI-focused workloads \\
+Vast.ai & \$0.20-1.50/hr & Medium & Varies & Budget-conscious \\
+AWS & \$1.00-30.00/hr & Complex & Excellent & Enterprise \\
+GCP & \$1.00-30.00/hr & Complex & Excellent & Enterprise \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Our Recommendation}: Use \textbf{RunPod} for the examples in this book. Their Docker-native approach aligns perfectly with our Docker Compose deployment, and pricing is competitive. Lambda Labs is a good alternative when RunPod availability is limited.
 
 % =============================================================================
-\section{AMD GPUs}
-\label{sec:amd-gpus-appendix}
+\section{RunPod (Recommended)}
+\label{sec:runpod-setup}
 % =============================================================================
 
-% TODO: ROCm-supported GPUs
+RunPod specializes in GPU compute for AI workloads. Their ``GPU Pods'' are Docker containers with NVIDIA drivers pre-installed.
+
+\subsection{Account Setup}
+\label{subsec:runpod-account}
+
+\begin{enumerate}
+\item Go to \url{https://runpod.io} and create an account
+\item Add a payment method (credit card or crypto)
+\item Add \$10-20 credit to start (you'll use ~\$5 for Part I)
+\end{enumerate}
+
+\subsection{Creating a GPU Pod}
+\label{subsec:runpod-create}
+
+\begin{enumerate}
+\item Click \textbf{Pods} → \textbf{+ Deploy}
+\item Select GPU type:
+  \begin{itemize}
+  \item \textbf{Part I (7B models)}: RTX 4090 (24GB, ~\$0.44/hr) or RTX A4000 (16GB, ~\$0.30/hr)
+  \item \textbf{Part II (30B models)}: A10G (24GB, ~\$0.50/hr) or A100 40GB (~\$1.50/hr)
+  \item \textbf{Part III+ (70B+ models)}: A100 80GB or multiple GPUs
+  \end{itemize}
+\item Select template: \textbf{RunPod Pytorch 2.1} (includes NVIDIA drivers)
+\item Set container disk: 50GB (for models)
+\item Set volume disk: 100GB (persistent storage for models)
+\item Click \textbf{Deploy}
+\end{enumerate}
+
+\subsection{Connecting to Your Pod}
+\label{subsec:runpod-connect}
+
+Once deployed (1-2 minutes):
+
+\begin{lstlisting}[language=bash]
+# Method 1: Web Terminal
+# Click "Connect" -> "Start Web Terminal"
+
+# Method 2: SSH (recommended)
+# Click "Connect" -> Copy SSH command
+ssh root@<pod-ip> -p <port> -i ~/.ssh/id_rsa
+\end{lstlisting}
+
+\subsection{Installing Docker Compose}
+\label{subsec:runpod-docker}
+
+RunPod pods have Docker pre-installed. Install Docker Compose:
+
+\begin{lstlisting}[language=bash]
+# Docker Compose is typically pre-installed, verify:
+docker compose version
+
+# If not installed:
+apt-get update && apt-get install -y docker-compose-plugin
+\end{lstlisting}
+
+\subsection{Setting Up NVIDIA Container Runtime}
+\label{subsec:runpod-nvidia}
+
+RunPod pods come with NVIDIA drivers and container toolkit pre-configured. Verify:
+
+\begin{lstlisting}[language=bash]
+# Check GPU is visible
+nvidia-smi
+
+# Verify Docker can see GPU
+docker run --rm --gpus all nvidia/cuda:12.1-base nvidia-smi
+\end{lstlisting}
+
+\subsection{Port Forwarding}
+\label{subsec:runpod-ports}
+
+To access services from your local machine:
+
+\begin{lstlisting}[language=bash]
+# In RunPod UI: "Connect" -> "TCP Port Mappings"
+# Add ports: 8080 (control plane), 3000 (Grafana)
+
+# Or use SSH tunneling:
+ssh -L 8080:localhost:8080 -L 3000:localhost:3000 \
+    root@<pod-ip> -p <port>
+\end{lstlisting}
+
+\subsection{Stopping and Resuming}
+\label{subsec:runpod-stop}
+
+You're billed per minute. Stop pods when not in use:
+
+\begin{lstlisting}[language=bash]
+# In UI: Click "Stop" on your pod
+# Your volume data persists
+
+# Resume later: Click "Start"
+# Note: Container disk resets, volume persists
+\end{lstlisting}
 
 % =============================================================================
-\section{Apple Silicon}
-\label{sec:apple-silicon-appendix}
+\section{Lambda Labs}
+\label{sec:lambda-setup}
 % =============================================================================
 
-% TODO: M-series specifications
+Lambda Labs offers cloud GPUs with a focus on machine learning workloads. They provide full VMs rather than containers.
+
+\subsection{Account Setup}
+\label{subsec:lambda-account}
+
+\begin{enumerate}
+\item Go to \url{https://lambdalabs.com/cloud} and create an account
+\item Add a payment method
+\item Request GPU quota increase if needed (some GPUs require approval)
+\end{enumerate}
+
+\subsection{Creating an Instance}
+\label{subsec:lambda-create}
+
+\begin{enumerate}
+\item Click \textbf{Instances} → \textbf{Launch Instance}
+\item Select instance type:
+  \begin{itemize}
+  \item \textbf{Part I}: 1x A10 (24GB, ~\$0.60/hr)
+  \item \textbf{Part II}: 1x A100 40GB (~\$1.10/hr)
+  \item \textbf{Part III+}: 1x A100 80GB or 8x A100 for large models
+  \end{itemize}
+\item Select region (choose closest for lower latency)
+\item Add your SSH key
+\item Click \textbf{Launch}
+\end{enumerate}
+
+\subsection{Connecting and Setup}
+\label{subsec:lambda-connect}
+
+\begin{lstlisting}[language=bash]
+# SSH into instance
+ssh ubuntu@<instance-ip>
+
+# Lambda instances run Ubuntu with NVIDIA drivers pre-installed
+nvidia-smi
+
+# Install Docker
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+
+# Log out and back in, then:
+docker --version
+
+# Install Docker Compose
+sudo apt-get update
+sudo apt-get install -y docker-compose-plugin
+
+# Install NVIDIA Container Toolkit
+distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | \
+    sudo apt-key add -
+curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | \
+    sudo tee /etc/apt/sources.list.d/nvidia-docker.list
+sudo apt-get update
+sudo apt-get install -y nvidia-container-toolkit
+sudo systemctl restart docker
+\end{lstlisting}
 
 % =============================================================================
-\section{Cloud GPU Pricing}
-\label{sec:cloud-pricing}
+\section{Vast.ai}
+\label{sec:vast-setup}
 % =============================================================================
 
-% TODO: Pricing comparison tables
+Vast.ai is a marketplace connecting GPU owners with renters. Pricing is competitive but reliability varies.
+
+\subsection{Account Setup}
+\label{subsec:vast-account}
+
+\begin{enumerate}
+\item Go to \url{https://vast.ai} and create an account
+\item Add credit via credit card or crypto
+\item Generate an SSH key if you haven't already
+\end{enumerate}
+
+\subsection{Finding and Renting a Machine}
+\label{subsec:vast-rent}
+
+\begin{enumerate}
+\item Click \textbf{Search} (or \textbf{Create})
+\item Filter by:
+  \begin{itemize}
+  \item GPU Type: RTX 4090, A10, A100
+  \item GPU RAM: 24GB+ for Part I
+  \item Disk Space: 100GB+
+  \item Internet Speed: 100Mbps+ recommended
+  \end{itemize}
+\item Sort by price (DLPerf/\$ for best value)
+\item Look for reliability score >95\%
+\item Select template: \textbf{nvidia/cuda:12.1.0-devel-ubuntu22.04}
+\item Click \textbf{Rent}
+\end{enumerate}
+
+\subsection{Connecting}
+\label{subsec:vast-connect}
+
+\begin{lstlisting}[language=bash]
+# Vast provides SSH command in UI
+ssh -p <port> root@<host>
+
+# Or use their CLI
+pip install vastai
+vastai set api-key <your-key>
+vastai ssh <instance-id>
+\end{lstlisting}
+
+\subsection{Caveats}
+\label{subsec:vast-caveats}
+
+\begin{itemize}
+\item Reliability varies by host (check reviews)
+\item Data on instance disk may not persist
+\item Some hosts have bandwidth limits
+\item Support is community-based
+\end{itemize}
+
+% =============================================================================
+\section{AWS (Enterprise)}
+\label{sec:aws-setup}
+% =============================================================================
+
+AWS offers GPU instances via EC2. More complex setup but excellent reliability and global availability.
+
+\subsection{GPU Instance Types}
+\label{subsec:aws-instances}
+
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+\textbf{Instance} & \textbf{GPU} & \textbf{VRAM} & \textbf{On-Demand Price} \\
+\midrule
+g4dn.xlarge & T4 & 16GB & ~\$0.53/hr \\
+g5.xlarge & A10G & 24GB & ~\$1.01/hr \\
+p4d.24xlarge & 8x A100 40GB & 320GB & ~\$32.77/hr \\
+p5.48xlarge & 8x H100 & 640GB & ~\$98.32/hr \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Tip}: Use Spot Instances for 60-90\% savings (but instances can be terminated).
+
+\subsection{Quick Start with AWS CLI}
+\label{subsec:aws-cli}
+
+\begin{lstlisting}[language=bash]
+# Install AWS CLI and configure
+aws configure
+
+# Launch g5.xlarge with Deep Learning AMI
+aws ec2 run-instances \
+  --image-id ami-0123456789abcdef0 \  # Deep Learning AMI
+  --instance-type g5.xlarge \
+  --key-name your-key \
+  --security-group-ids sg-xxx \
+  --subnet-id subnet-xxx
+
+# SSH in
+ssh -i your-key.pem ubuntu@<public-ip>
+
+# GPU drivers and Docker pre-installed on Deep Learning AMI
+nvidia-smi
+docker --version
+\end{lstlisting}
+
+\subsection{Security Group Configuration}
+\label{subsec:aws-security}
+
+Allow inbound traffic on:
+\begin{itemize}
+\item Port 22 (SSH)
+\item Port 8080 (Control Plane API)
+\item Port 3000 (Grafana) - restrict to your IP
+\item Port 9090 (Prometheus) - restrict to your IP
+\end{itemize}
+
+% =============================================================================
+\section{GCP (Enterprise)}
+\label{sec:gcp-setup}
+% =============================================================================
+
+Google Cloud offers GPU VMs with similar capabilities to AWS.
+
+\subsection{GPU Options}
+\label{subsec:gcp-gpus}
+
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+\textbf{GPU} & \textbf{VRAM} & \textbf{Machine Type} & \textbf{Approx Price} \\
+\midrule
+T4 & 16GB & n1-standard-4 + T4 & ~\$0.35/hr \\
+L4 & 24GB & g2-standard-4 & ~\$0.70/hr \\
+A100 40GB & 40GB & a2-highgpu-1g & ~\$3.67/hr \\
+A100 80GB & 80GB & a2-ultragpu-1g & ~\$5.07/hr \\
+H100 & 80GB & a3-highgpu-1g & ~\$10.00/hr \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Quick Start with gcloud}
+\label{subsec:gcp-cli}
+
+\begin{lstlisting}[language=bash]
+# Install gcloud CLI and authenticate
+gcloud auth login
+gcloud config set project YOUR_PROJECT
+
+# Create GPU VM with Deep Learning image
+gcloud compute instances create inference-vm \
+  --zone=us-central1-a \
+  --machine-type=g2-standard-4 \
+  --accelerator=type=nvidia-l4,count=1 \
+  --image-family=common-cu121-ubuntu-2204 \
+  --image-project=deeplearning-platform-release \
+  --boot-disk-size=200GB \
+  --maintenance-policy=TERMINATE
+
+# SSH in
+gcloud compute ssh inference-vm --zone=us-central1-a
+
+# Install Docker (not in default image)
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+# Log out and back in
+
+# Install NVIDIA Container Toolkit
+# (same as Lambda Labs section)
+\end{lstlisting}
+
+% =============================================================================
+\section{Common Setup Steps}
+\label{sec:common-setup}
+% =============================================================================
+
+Once you have a GPU instance running with Docker, these steps apply to all providers:
+
+\subsection{Verify GPU Access in Docker}
+\label{subsec:verify-gpu}
+
+\begin{lstlisting}[language=bash]
+# Test NVIDIA runtime
+docker run --rm --gpus all nvidia/cuda:12.1-base nvidia-smi
+
+# You should see your GPU(s) listed
+\end{lstlisting}
+
+\subsection{Clone the Book Repository}
+\label{subsec:clone-repo}
+
+\begin{lstlisting}[language=bash]
+git clone https://github.com/inference-book/inference-plane
+cd inference-plane
+git checkout v0.1  # Start with Chapter 6
+\end{lstlisting}
+
+\subsection{Start the Stack}
+\label{subsec:start-stack}
+
+\begin{lstlisting}[language=bash]
+docker compose up -d
+# Wait for services to start
+
+# Check status
+docker compose ps
+
+# Pull a model
+docker compose exec ollama ollama pull llama3.2:7b
+
+# Verify
+curl http://localhost:8080/health
+\end{lstlisting}
+
+\subsection{Access Services Remotely}
+\label{subsec:remote-access}
+
+If you're running on a cloud instance and want to access from your local machine:
+
+\begin{lstlisting}[language=bash]
+# SSH tunnel (works with any provider)
+ssh -L 8080:localhost:8080 \
+    -L 3000:localhost:3000 \
+    -L 9090:localhost:9090 \
+    user@your-instance-ip
+
+# Then access locally:
+# http://localhost:8080/health  - API
+# http://localhost:3000         - Grafana
+# http://localhost:9090         - Prometheus
+\end{lstlisting}
+
+% =============================================================================
+\section{Cost Management Tips}
+\label{sec:cost-tips}
+% =============================================================================
+
+\begin{description}
+\item[Stop When Not Using] GPU instances cost money even when idle. Stop/pause instances during breaks.
+\item[Use Spot/Preemptible] For experimentation, spot instances offer 60-90\% savings. Your work may be interrupted, but for learning that's acceptable.
+\item[Right-Size Your GPU] A 7B model doesn't need an H100. Match GPU to model size.
+\item[Monitor Usage] Set billing alerts to avoid surprises.
+\item[Clean Up] Delete instances and volumes you're no longer using.
+\end{description}
+
+\begin{svgraybox}
+\textbf{Estimated Costs for This Book}
+
+Running all examples in this book:
+\begin{itemize}
+\item \textbf{Part I} (7B models): ~\$5-10 on RunPod/Lambda
+\item \textbf{Part II} (30B models): ~\$15-25
+\item \textbf{Part III} (70B models): ~\$30-50
+\item \textbf{Part IV} (400B models): ~\$50-100
+\end{itemize}
+
+Total: approximately \$100-200 if you're diligent about stopping instances.
+\end{svgraybox}

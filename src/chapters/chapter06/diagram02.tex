@@ -1,0 +1,56 @@
+% Diagram: Request Flow through Control Plane
+% Shows the step-by-step processing of a request
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    node distance=0.6cm,
+    flowstep/.style={rectangle, draw, rounded corners, minimum width=2.8cm, minimum height=0.7cm, align=center, font=\small},
+    arrow/.style={->, thick, >=stealth},
+    label/.style={font=\footnotesize\itshape, text=gray}
+]
+
+% Left column - Request path
+\node[flowstep, fill=blue!15] (req) {1. Request\\Arrives};
+\node[flowstep, fill=blue!10, below=of req] (log) {2. Logging\\Middleware};
+\node[flowstep, fill=blue!10, below=of log] (metrics1) {3. Metrics\\Middleware};
+\node[flowstep, fill=green!15, below=of metrics1] (validate) {4. Validate\\Request};
+\node[flowstep, fill=orange!15, below=of validate] (backend) {5. Backend\\Call};
+
+% Right column - Response path
+\node[flowstep, fill=orange!15, right=3cm of backend] (process) {6. Process\\Response};
+\node[flowstep, fill=purple!15, above=of process] (record) {7. Record\\Metrics};
+\node[flowstep, fill=blue!15, above=of record] (resp) {8. Send\\Response};
+
+% Arrows - down the left side
+\draw[arrow] (req) -- (log);
+\draw[arrow] (log) -- (metrics1);
+\draw[arrow] (metrics1) -- (validate);
+\draw[arrow] (validate) -- (backend);
+
+% Arrow across to right side
+\draw[arrow] (backend) -- node[above, label] {Ollama} (process);
+
+% Arrows - up the right side
+\draw[arrow] (process) -- (record);
+\draw[arrow] (record) -- (resp);
+
+% Side annotations
+\node[label, anchor=east] at ($(req.west) - (0.3, 0)$) {POST /v1/completions};
+\node[label, anchor=east] at ($(log.west) - (0.3, 0)$) {assign request\_id};
+\node[label, anchor=east] at ($(metrics1.west) - (0.3, 0)$) {start timer};
+\node[label, anchor=west] at ($(record.east) + (0.3, 0)$) {histogram, counter};
+\node[label, anchor=west] at ($(resp.east) + (0.3, 0)$) {JSON response};
+
+% Time indicator
+\draw[<->, gray, dashed] ($(req.east) + (1.2, 0)$) -- ($(backend.east) + (1.2, 0)$);
+\node[label, rotate=90] at ($(validate.east) + (1.5, 0)$) {~10ms overhead};
+
+\draw[<->, gray, dashed] ($(backend.east) + (1.2, 0)$) -- ($(process.west) - (0.5, 0)$);
+\node[label] at ($(backend.east) + (2.2, 0.3)$) {100ms-60s};
+\node[label] at ($(backend.east) + (2.2, -0.1)$) {(inference)};
+
+\end{tikzpicture}
+\caption{Request flow through the control plane. Steps 1-4 add ~10ms overhead. Step 5 (inference) dominates latency. The request ID assigned in step 2 appears in all logs, enabling end-to-end tracing.}
+\label{fig:request-flow}
+\end{figure}

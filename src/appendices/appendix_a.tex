@@ -1,103 +1,324 @@
 %%%%%%%%%%%%%%%%%%%%% appendix_a.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% Appendix A: Complete Control Plane Code Reference
+% Appendix A: Control Plane Key Abstractions
 %
 %%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \appendix
-\chapter{Complete Control Plane Code Reference}
+\chapter{Control Plane Key Abstractions}
 \label{ch:appendix-code}
 
-This appendix provides complete code listings for the control plane implementation across all versions.
+This appendix documents the core interfaces and types that define the control plane architecture. These abstractions remain stable across versions---new features extend them rather than replace them.
+
+For complete implementation code, setup instructions, and deployment templates, see:
+
+\begin{center}
+\texttt{github.com/inference-book/inference-plane}
+\end{center}
 
 % =============================================================================
-\section{Project Structure}
-\label{sec:project-structure}
+\section{Backend Interface}
+\label{sec:backend-interface-ref}
 % =============================================================================
 
-\begin{programcode}{Directory Structure}
-\begin{lstlisting}[language=bash]
-inference-control-plane/
-├── cmd/
-│   └── server/
-│       └── main.go
-├── internal/
-│   ├── api/
-│   │   ├── handler.go
-│   │   ├── middleware.go
-│   │   └── routes.go
-│   ├── auth/
-│   │   ├── apikey.go
-│   │   ├── jwt.go
-│   │   └── middleware.go
-│   ├── backend/
-│   │   ├── backend.go
-│   │   ├── ollama.go
-│   │   └── vllm.go
-│   ├── billing/
-│   │   ├── meter.go
-│   │   └── stripe.go
-│   ├── cache/
-│   │   ├── cache.go
-│   │   ├── redis.go
-│   │   └── semantic.go
-│   ├── config/
-│   │   └── config.go
-│   ├── health/
-│   │   └── health.go
-│   ├── metrics/
-│   │   └── metrics.go
-│   ├── queue/
-│   │   ├── queue.go
-│   │   └── worker.go
-│   ├── ratelimit/
-│   │   ├── limiter.go
-│   │   └── middleware.go
-│   ├── router/
-│   │   └── router.go
-│   └── tenant/
-│       └── tenant.go
-├── deployments/
-│   └── docker/
-│       ├── Dockerfile
-│       └── docker-compose.yml
-├── configs/
-│   └── config.yaml
-└── go.mod
+The \texttt{Backend} interface is the central abstraction for inference engines. Any engine (Ollama, vLLM, TensorRT-LLM) implements this interface to plug into the control plane.
+
+\begin{programcode}{Backend Interface}
+\begin{lstlisting}[language=Go]
+// Backend represents an inference engine that can generate completions.
+type Backend interface {
+    // Generate performs inference and returns the response.
+    // The context enables timeout and cancellation.
+    Generate(ctx context.Context, req GenerateRequest) (GenerateResponse, error)
+
+    // GenerateStream performs streaming inference.
+    // Returns a channel that emits response chunks.
+    GenerateStream(ctx context.Context, req GenerateRequest) (<-chan StreamChunk, error)
+
+    // Health checks if the backend is operational.
+    // Returns nil if healthy, error with details otherwise.
+    Health(ctx context.Context) error
+
+    // Name returns the backend identifier for logging and metrics.
+    Name() string
+
+    // Models returns the list of available models.
+    Models(ctx context.Context) ([]Model, error)
+}
 \end{lstlisting}
 \end{programcode}
 
 % =============================================================================
-\section{Core Interfaces}
-\label{sec:core-interfaces-appendix}
+\section{Request and Response Types}
+\label{sec:request-response-ref}
 % =============================================================================
 
-% TODO: Complete interface listings
+Request and response types follow the OpenAI API format for compatibility with existing tools and SDKs.
+
+\begin{programcode}{Generate Request}
+\begin{lstlisting}[language=Go]
+// GenerateRequest represents a completion request (OpenAI-compatible).
+type GenerateRequest struct {
+    Model       string    `json:"model"`
+    Prompt      string    `json:"prompt,omitempty"`       // For completions
+    Messages    []Message `json:"messages,omitempty"`     // For chat
+    MaxTokens   int       `json:"max_tokens,omitempty"`
+    Temperature float64   `json:"temperature,omitempty"`
+    TopP        float64   `json:"top_p,omitempty"`
+    Stream      bool      `json:"stream,omitempty"`
+    Stop        []string  `json:"stop,omitempty"`
+}
+
+// Message represents a chat message.
+type Message struct {
+    Role    string `json:"role"`    // "system", "user", "assistant"
+    Content string `json:"content"`
+}
+\end{lstlisting}
+\end{programcode}
+
+\begin{programcode}{Generate Response}
+\begin{lstlisting}[language=Go]
+// GenerateResponse represents a completion response (OpenAI-compatible).
+type GenerateResponse struct {
+    ID      string   `json:"id"`
+    Object  string   `json:"object"`
+    Created int64    `json:"created"`
+    Model   string   `json:"model"`
+    Choices []Choice `json:"choices"`
+    Usage   Usage    `json:"usage"`
+}
+
+// Choice represents a single completion choice.
+type Choice struct {
+    Index        int     `json:"index"`
+    Text         string  `json:"text,omitempty"`          // For completions
+    Message      *Message `json:"message,omitempty"`      // For chat
+    FinishReason string  `json:"finish_reason"`
+}
+
+// Usage tracks token consumption.
+type Usage struct {
+    PromptTokens     int `json:"prompt_tokens"`
+    CompletionTokens int `json:"completion_tokens"`
+    TotalTokens      int `json:"total_tokens"`
+}
+\end{lstlisting}
+\end{programcode}
 
 % =============================================================================
-\section{v0.1 Implementation}
-\label{sec:v01-impl}
+\section{Health Check Types}
+\label{sec:health-types-ref}
 % =============================================================================
 
-% TODO: Complete v0.1 code
+Health checking uses a three-state model that enables nuanced operational decisions.
+
+\begin{programcode}{Health Status}
+\begin{lstlisting}[language=Go]
+// Status represents component health state.
+type Status string
+
+const (
+    StatusHealthy   Status = "healthy"   // Fully operational
+    StatusDegraded  Status = "degraded"  // Working but impaired
+    StatusUnhealthy Status = "unhealthy" // Not operational
+)
+
+// CheckResult contains health check details.
+type CheckResult struct {
+    Name      string        `json:"name"`       // Component name
+    Status    Status        `json:"status"`     // Health status
+    Message   string        `json:"message"`    // Human-readable details
+    Latency   time.Duration `json:"latency"`    // Check duration
+    Timestamp time.Time     `json:"timestamp"`  // When check ran
+}
+
+// HealthResponse aggregates all component health.
+type HealthResponse struct {
+    Status  Status        `json:"status"`   // Overall status
+    Checks  []CheckResult `json:"checks"`   // Individual components
+}
+\end{lstlisting}
+\end{programcode}
 
 % =============================================================================
-\section{v0.2 Additions}
-\label{sec:v02-additions}
+\section{Configuration}
+\label{sec:config-ref}
 % =============================================================================
 
-% TODO: Complete v0.2 code
+Configuration supports YAML files with environment variable overrides.
+
+\begin{programcode}{Configuration Structure}
+\begin{lstlisting}[language=Go]
+// Config holds all control plane configuration.
+type Config struct {
+    Server   ServerConfig   `yaml:"server"`
+    Backend  BackendConfig  `yaml:"backend"`
+    Metrics  MetricsConfig  `yaml:"metrics"`
+    Logging  LoggingConfig  `yaml:"logging"`
+    Auth     AuthConfig     `yaml:"auth"`      // v0.2+
+    Cache    CacheConfig    `yaml:"cache"`     // v0.2+
+    RateLimit RateLimitConfig `yaml:"rate_limit"` // v0.2+
+}
+
+// ServerConfig defines HTTP server settings.
+type ServerConfig struct {
+    Host         string        `yaml:"host" env:"CP_HOST"`
+    Port         int           `yaml:"port" env:"CP_PORT"`
+    ReadTimeout  time.Duration `yaml:"read_timeout"`
+    WriteTimeout time.Duration `yaml:"write_timeout"`
+}
+
+// BackendConfig defines inference backend settings.
+type BackendConfig struct {
+    Type    string        `yaml:"type"`    // "ollama", "vllm", etc.
+    URL     string        `yaml:"url" env:"CP_BACKEND_URL"`
+    Timeout time.Duration `yaml:"timeout"`
+}
+\end{lstlisting}
+\end{programcode}
 
 % =============================================================================
-\section{v0.3 Additions}
-\label{sec:v03-additions}
+\section{Metrics}
+\label{sec:metrics-ref}
 % =============================================================================
 
-% TODO: Complete v0.3 code
+The control plane exposes Prometheus metrics for monitoring and alerting.
+
+\begin{programcode}{Core Metrics}
+\begin{lstlisting}[language=Go]
+// Metrics registered with Prometheus.
+var (
+    // RequestsTotal counts requests by model and status.
+    RequestsTotal = prometheus.NewCounterVec(
+        prometheus.CounterOpts{
+            Name: "inference_requests_total",
+            Help: "Total inference requests",
+        },
+        []string{"model", "status"},
+    )
+
+    // RequestDuration tracks latency distribution.
+    RequestDuration = prometheus.NewHistogramVec(
+        prometheus.HistogramOpts{
+            Name:    "inference_request_duration_seconds",
+            Help:    "Request duration in seconds",
+            Buckets: []float64{0.1, 0.5, 1, 2, 5, 10, 30, 60},
+        },
+        []string{"model"},
+    )
+
+    // TokensGenerated counts output tokens.
+    TokensGenerated = prometheus.NewCounterVec(
+        prometheus.CounterOpts{
+            Name: "inference_tokens_generated_total",
+            Help: "Total tokens generated",
+        },
+        []string{"model"},
+    )
+
+    // BackendHealthy indicates backend status (1=up, 0=down).
+    BackendHealthy = prometheus.NewGauge(
+        prometheus.GaugeOpts{
+            Name: "inference_backend_healthy",
+            Help: "Backend health status",
+        },
+    )
+)
+\end{lstlisting}
+\end{programcode}
 
 % =============================================================================
-\section{v1.0 Additions}
-\label{sec:v10-additions}
+\section{Middleware Chain}
+\label{sec:middleware-ref}
 % =============================================================================
 
-% TODO: Complete v1.0 code
+Requests pass through a middleware chain that handles cross-cutting concerns.
+
+\begin{programcode}{Middleware Interface}
+\begin{lstlisting}[language=Go]
+// Middleware wraps an HTTP handler with additional behavior.
+type Middleware func(http.Handler) http.Handler
+
+// Chain composes multiple middlewares into a single middleware.
+func Chain(middlewares ...Middleware) Middleware {
+    return func(next http.Handler) http.Handler {
+        for i := len(middlewares) - 1; i >= 0; i-- {
+            next = middlewares[i](next)
+        }
+        return next
+    }
+}
+
+// Standard middleware chain (order matters):
+// 1. Recovery   - Catches panics, returns 500
+// 2. RequestID  - Assigns unique ID for tracing
+// 3. Logging    - Logs request/response details
+// 4. Metrics    - Records latency and counts
+// 5. Auth       - Validates credentials (v0.2+)
+// 6. RateLimit  - Enforces rate limits (v0.2+)
+\end{lstlisting}
+\end{programcode}
+
+% =============================================================================
+\section{Error Types}
+\label{sec:errors-ref}
+% =============================================================================
+
+Structured errors enable consistent error handling and client responses.
+
+\begin{programcode}{Error Types}
+\begin{lstlisting}[language=Go]
+// APIError represents a structured error response.
+type APIError struct {
+    Code    string `json:"code"`
+    Message string `json:"message"`
+    Details any    `json:"details,omitempty"`
+}
+
+// Common error codes
+const (
+    ErrCodeInvalidRequest  = "invalid_request"
+    ErrCodeAuthentication  = "authentication_error"
+    ErrCodeRateLimited     = "rate_limit_exceeded"
+    ErrCodeBackendError    = "backend_error"
+    ErrCodeBackendTimeout  = "backend_timeout"
+    ErrCodeModelNotFound   = "model_not_found"
+    ErrCodeInternalError   = "internal_error"
+)
+
+// Error implements the error interface.
+func (e APIError) Error() string {
+    return e.Message
+}
+\end{lstlisting}
+\end{programcode}
+
+% =============================================================================
+\section{Version Evolution}
+\label{sec:version-evolution}
+% =============================================================================
+
+The interfaces above form the stable core. Each version adds capabilities:
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Version} & \textbf{Chapter} & \textbf{Additions} \\
+\midrule
+v0.1 & 6 & Backend, Health, Metrics, Logging \\
+v0.2 & 7-9 & Auth, RateLimit, Cache interfaces \\
+v0.3 & 12-15 & Tenant, Billing, Router interfaces \\
+v1.0 & 18-19 & Cluster, Scheduler, Autoscaler interfaces \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Each version's complete implementation is available as a git tag:
+
+\begin{lstlisting}[language=bash]
+git checkout v0.1  # Chapter 6 implementation
+git checkout v0.2  # After Part II
+git checkout v0.3  # After Part III
+git checkout v1.0  # Complete platform
+\end{lstlisting}

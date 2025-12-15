@@ -1,561 +1,516 @@
-%%%%%%%%%%%%%%%%%%%%% chapter05.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%% chapter06.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% Chapter 5: Building Control Plane v0.1
+% Chapter 6: Building Control Plane v0.1
 %
 %%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \chapter{Building Control Plane v0.1}
 \label{ch:control-plane-v01}
 
-\abstract*{This chapter is where theory meets practice. We build the first version of our Go-based control plane---a foundation that will evolve throughout the book. Control Plane v0.1 provides a single backend proxy, unified API, health checks, metrics collection, and Docker deployment with Prometheus and Grafana. By the end, you'll have a working inference system with observability built in from day one.}
+\abstract*{This chapter is where theory meets practice. We design and build the first version of our control plane---a foundation that will evolve throughout the book. Rather than a language tutorial, we focus on architecture, abstractions, and the reasoning behind design decisions. The complete implementation is available at \texttt{github.com/inference-book/inference-plane}, and by the end of this chapter you'll have a working inference system with observability built in from day one.}
 
-\abstract{This chapter is where theory meets practice. We build the first version of our Go-based control plane---a foundation that will evolve throughout the book. Control Plane v0.1 provides a single backend proxy, unified API, health checks, metrics collection, and Docker deployment with Prometheus and Grafana. By the end, you'll have a working inference system with observability built in from day one.}
-
-% =============================================================================
-\section{Control Plane Architecture}
-\label{sec:cp-architecture}
-% =============================================================================
-
-% TODO: High-level architecture overview
-
-\subsection{What is a Control Plane?}
-\label{subsec:what-is-control-plane}
-
-% TODO: Define the concept
-% - Separating control from data flow
-% - Why abstraction matters
-% - Evolution path
-
-\subsection{v0.1 Capabilities}
-\label{subsec:v01-capabilities}
-
-% TODO: What we're building
-% - Single backend proxy
-% - Unified API (OpenAI-compatible)
-% - Health checks
-% - Metrics (Prometheus)
-% - Configuration management
-
-\subsection{System Architecture Diagram}
-\label{subsec:architecture-diagram}
-
-% TODO: ASCII or figure showing:
-% Client -> Control Plane -> Inference Engine (Ollama/vLLM)
-%                |
-%                v
-%           Prometheus -> Grafana
+\abstract{This chapter is where theory meets practice. We design and build the first version of our control plane---a foundation that will evolve throughout the book. Rather than a language tutorial, we focus on architecture, abstractions, and the reasoning behind design decisions. The complete implementation is available at \texttt{github.com/inference-book/inference-plane}, and by the end of this chapter you'll have a working inference system with observability built in from day one.}
 
 % =============================================================================
-\section{Project Setup}
-\label{sec:project-setup}
+\section{Setting Up Your Lab Environment}
+\label{sec:lab-environment}
 % =============================================================================
 
-% TODO: Setting up the Go project
+Before we start building, let's address a practical question: where should you run these examples?
 
-\subsection{Go Module Initialization}
-\label{subsec:go-module}
+\subsection{Local vs. Cloud: Our Recommendation}
+\label{subsec:local-vs-cloud}
 
-\begin{programcode}{Project Structure}
+The previous chapters could be followed on any machine---reading model files, understanding architectures, and exploring inference engines requires minimal resources. But from this chapter forward, we'll be running actual inference workloads, and that changes things.
+
+\textbf{We recommend using cloud GPU providers} for the hands-on portions of this book. Here's why:
+
+\begin{description}
+\item[Consistency] Every reader gets the same environment. No ``works on my machine'' problems. When we say ``pull llama3.2:7b and run inference,'' you'll see the same performance whether you're in Tokyo or Toronto.
+
+\item[Accessibility] Not everyone has access to a modern GPU. A MacBook with M1 can run small models, but a \$500/month cloud instance with an A100 runs circles around it---and you only pay for hours used.
+
+\item[Production Realism] Self-hosting inference typically means cloud deployment. Learning to provision, configure, and manage cloud GPU instances is part of the skill set you're developing.
+
+\item[Cost Efficiency] A 7B model runs well on a \$0.50/hour instance. Running all Part I exercises might cost \$5-10 total. Compare that to buying and maintaining GPU hardware.
+\end{description}
+
+\subsection{What You'll Need}
+\label{subsec:what-youll-need}
+
+For Part I of this book (Chapters 6-7):
+\begin{itemize}
+\item A cloud GPU instance with 16-24GB VRAM (A10, RTX 4090, or similar)
+\item Ubuntu 22.04 or later (the default on most providers)
+\item Docker and Docker Compose installed
+\item SSH access to the instance
+\end{itemize}
+
+Appendix~\ref{ch:appendix-gpu-providers} provides step-by-step setup guides for five popular GPU providers: AWS, GCP, Lambda Labs, RunPod, and Vast.ai. We recommend Lambda Labs or RunPod for beginners due to their simple interfaces and competitive pricing.
+
+\begin{svgraybox}
+\textbf{Running Locally (If You Prefer)}
+
+If you have suitable hardware (Apple Silicon Mac, NVIDIA GPU with 8GB+ VRAM, or 32GB+ RAM for CPU inference), the examples work locally too. We note where cloud-specific steps apply. Just be aware that your results may differ from the examples depending on your hardware.
+\end{svgraybox}
+
+% =============================================================================
+\section{Why a Control Plane?}
+\label{sec:why-control-plane}
+% =============================================================================
+
+You've learned how LLMs work, selected hardware, chosen models, and compared inference engines. Now it's time to build. But why not just call Ollama or vLLM directly from your application?
+
+\subsection{The Direct Integration Problem}
+\label{subsec:direct-integration}
+
+Consider a typical application that needs LLM capabilities:
+
 \begin{lstlisting}[language=bash]
-# Initialize project
-mkdir inference-control-plane
-cd inference-control-plane
-go mod init github.com/yourorg/inference-control-plane
-
-# Create directory structure
-mkdir -p cmd/server
-mkdir -p internal/{api,backend,config,health,metrics}
-mkdir -p deployments/docker
-mkdir -p configs
+# Your application calls Ollama directly
+curl http://localhost:11434/api/generate \
+  -d '{"model": "llama3.2:7b", "prompt": "Hello"}'
 \end{lstlisting}
-\end{programcode}
 
-\subsection{Dependencies}
-\label{subsec:dependencies}
+This works for prototyping, but problems emerge quickly:
 
-% TODO: Key dependencies
-% - chi or standard library router
-% - prometheus client
-% - structured logging (slog)
-% - configuration (viper or similar)
+\begin{description}
+\item[Engine Lock-in] Your application code contains Ollama-specific URLs and request formats. Switching to vLLM means changing every call site.
+\item[No Visibility] How many requests per second? What's the p99 latency? Which models are popular? You have no idea.
+\item[No Control] Every request gets equal treatment. No rate limiting, no authentication, no prioritization.
+\item[Fragile Operations] The engine goes down and your application crashes. No health checks, no graceful degradation.
+\end{description}
+
+\subsection{The Control Plane Solution}
+\label{subsec:control-plane-solution}
+
+In networking, a \emph{control plane} handles configuration and policy decisions while the \emph{data plane} moves actual traffic. We borrow this concept: our control plane manages \emph{how} requests are handled while inference engines handle computation.
+
+\begin{description}
+\item[Backend Abstraction] Your application talks to the control plane using a standard API (OpenAI-compatible). The control plane translates to whatever backend you're running.
+\item[Centralized Policy] Authentication, rate limiting, caching, and logging happen in one place. Change policy without touching application code.
+\item[Observability] Every request is measured. Latency histograms, error rates, token throughput---all available in Prometheus and Grafana.
+\item[Resilience] Health checks detect backend failures. Future versions will add failover, retries, and circuit breakers.
+\end{description}
+
+\input{chapters/chapter06/diagram01}
 
 % =============================================================================
-\section{Core Interfaces}
-\label{sec:core-interfaces}
+\section{v0.1 Scope and Architecture}
+\label{sec:v01-architecture}
 % =============================================================================
 
-% TODO: Define the foundational interfaces
+Control Plane v0.1 is intentionally minimal---enough to be useful while establishing patterns for growth.
 
-\subsection{Backend Interface}
+\subsection{What We're Building}
+\label{subsec:what-building}
+
+\begin{svgraybox}
+\textbf{Control Plane v0.1 Features:}
+\begin{itemize}
+\item \textbf{Single Backend Proxy}: Routes all requests to one Ollama instance
+\item \textbf{OpenAI-Compatible API}: \texttt{/v1/completions} and \texttt{/v1/chat/completions} endpoints
+\item \textbf{Health Endpoint}: \texttt{/health} returns backend status
+\item \textbf{Prometheus Metrics}: Request count, latency histogram, error rate
+\item \textbf{Structured Logging}: JSON logs with request IDs for tracing
+\item \textbf{Configuration}: YAML file with environment variable overrides
+\end{itemize}
+\end{svgraybox}
+
+\subsection{What We're Not Building (Yet)}
+\label{subsec:not-building}
+
+These features come in later chapters:
+\begin{itemize}
+\item Authentication and API keys (Chapter~\ref{ch:authentication})
+\item Rate limiting and quotas (Chapter~\ref{ch:rate-limiting})
+\item Response caching (Chapter~\ref{ch:caching})
+\item Multiple backends and routing (Chapter~\ref{ch:model-routing})
+\item Streaming responses (we add this in the problems section)
+\end{itemize}
+
+\subsection{Component Overview}
+\label{subsec:components}
+
+The control plane consists of five components:
+
+\begin{description}
+\item[API Server] HTTP server exposing OpenAI-compatible endpoints. Accepts requests, validates input, forwards to backend proxy.
+\item[Backend Proxy] Translates OpenAI API format to backend-specific format (Ollama, vLLM). Handles response conversion.
+\item[Health Checker] Periodically probes backend health. Exposes aggregated status via \texttt{/health}.
+\item[Metrics Collector] Records request metrics (count, latency, tokens). Exposes Prometheus endpoint at \texttt{/metrics}.
+\item[Configuration] Loads settings from YAML and environment variables. Provides typed access to config values.
+\end{description}
+
+% =============================================================================
+\section{Key Abstractions}
+\label{sec:key-abstractions}
+% =============================================================================
+
+Good abstractions make code extensible. v0.1 defines two core interfaces that remain stable as we add features.
+
+\subsection{The Backend Interface}
 \label{subsec:backend-interface}
 
-\begin{programcode}{Backend Interface}
+The \texttt{Backend} interface abstracts inference engines. Any engine that implements these three methods can plug into our control plane:
+
+\begin{programcode}{Backend Interface (Go)}
 \begin{lstlisting}[language=Go]
-// internal/backend/backend.go
-
-package backend
-
-import "context"
-
-// GenerateRequest represents an inference request
-type GenerateRequest struct {
-    Model       string   `json:"model"`
-    Prompt      string   `json:"prompt"`
-    MaxTokens   int      `json:"max_tokens,omitempty"`
-    Temperature float64  `json:"temperature,omitempty"`
-    Stream      bool     `json:"stream,omitempty"`
-    Stop        []string `json:"stop,omitempty"`
-}
-
-// GenerateResponse represents an inference response
-type GenerateResponse struct {
-    ID      string `json:"id"`
-    Object  string `json:"object"`
-    Created int64  `json:"created"`
-    Model   string `json:"model"`
-    Choices []Choice `json:"choices"`
-    Usage   Usage  `json:"usage"`
-}
-
-type Choice struct {
-    Index        int    `json:"index"`
-    Text         string `json:"text,omitempty"`
-    Message      *Message `json:"message,omitempty"`
-    FinishReason string `json:"finish_reason"`
-}
-
-type Message struct {
-    Role    string `json:"role"`
-    Content string `json:"content"`
-}
-
-type Usage struct {
-    PromptTokens     int `json:"prompt_tokens"`
-    CompletionTokens int `json:"completion_tokens"`
-    TotalTokens      int `json:"total_tokens"`
-}
-
-// Backend defines the interface for inference backends
 type Backend interface {
-    // Generate performs text generation
+    // Generate performs inference and returns the response
     Generate(ctx context.Context, req GenerateRequest) (GenerateResponse, error)
 
-    // Health checks if the backend is healthy
+    // Health checks if the backend is operational
     Health(ctx context.Context) error
 
-    // Name returns the backend identifier
+    // Name returns the backend identifier for logging/metrics
     Name() string
 }
 \end{lstlisting}
 \end{programcode}
 
-\subsection{Health Interface}
+Why these three methods?
+
+\begin{description}
+\item[Generate] The core operation. Takes a request, returns a response. The \texttt{context.Context} parameter enables timeouts and cancellation---essential for long-running inference.
+\item[Health] Allows the control plane to detect backend failures before users do. Returns \texttt{nil} if healthy, error otherwise.
+\item[Name] Used in metrics labels and logs. When you have multiple backends, you need to know which one handled each request.
+\end{description}
+
+The \texttt{GenerateRequest} and \texttt{GenerateResponse} types use OpenAI's format. This means:
+\begin{itemize}
+\item Clients can use existing OpenAI SDKs
+\item Switching from OpenAI API to self-hosted requires only a URL change
+\item Backend implementations translate to/from engine-specific formats
+\end{itemize}
+
+\subsection{The Health Checker Interface}
 \label{subsec:health-interface}
 
-\begin{programcode}{Health Check Interface}
+Health checking is more nuanced than a simple up/down boolean:
+
+\begin{programcode}{Health Status Types}
 \begin{lstlisting}[language=Go]
-// internal/health/health.go
-
-package health
-
-import "context"
-
-// Status represents health status
 type Status string
 
 const (
-    StatusHealthy   Status = "healthy"
-    StatusDegraded  Status = "degraded"
-    StatusUnhealthy Status = "unhealthy"
+    StatusHealthy   Status = "healthy"   // Fully operational
+    StatusDegraded  Status = "degraded"  // Working but impaired
+    StatusUnhealthy Status = "unhealthy" // Not operational
 )
 
-// CheckResult contains a health check result
 type CheckResult struct {
-    Name    string `json:"name"`
-    Status  Status `json:"status"`
-    Message string `json:"message,omitempty"`
-    Latency int64  `json:"latency_ms"`
-}
-
-// Checker defines a health check component
-type Checker interface {
-    Check(ctx context.Context) CheckResult
-    Name() string
-}
-
-// Aggregator combines multiple health checks
-type Aggregator interface {
-    Register(checker Checker)
-    CheckAll(ctx context.Context) []CheckResult
-    OverallStatus(ctx context.Context) Status
+    Name    string  // Component name
+    Status  Status  // Health status
+    Message string  // Human-readable details
+    Latency int64   // Check duration in milliseconds
 }
 \end{lstlisting}
 \end{programcode}
 
-% =============================================================================
-\section{Implementing the Ollama Backend}
-\label{sec:ollama-backend}
-% =============================================================================
-
-% TODO: Concrete implementation
-
-\begin{programcode}{Ollama Backend Implementation}
-\begin{lstlisting}[language=Go]
-// internal/backend/ollama.go
-
-package backend
-
-import (
-    "bytes"
-    "context"
-    "encoding/json"
-    "fmt"
-    "net/http"
-    "time"
-)
-
-type OllamaBackend struct {
-    baseURL    string
-    httpClient *http.Client
-    model      string
-}
-
-func NewOllamaBackend(baseURL, model string) *OllamaBackend {
-    return &OllamaBackend{
-        baseURL: baseURL,
-        model:   model,
-        httpClient: &http.Client{
-            Timeout: 5 * time.Minute,
-        },
-    }
-}
-
-func (b *OllamaBackend) Name() string {
-    return "ollama"
-}
-
-func (b *OllamaBackend) Generate(ctx context.Context, req GenerateRequest) (GenerateResponse, error) {
-    // Convert to Ollama format
-    ollamaReq := map[string]interface{}{
-        "model":  req.Model,
-        "prompt": req.Prompt,
-        "stream": false,
-    }
-
-    if req.MaxTokens > 0 {
-        ollamaReq["num_predict"] = req.MaxTokens
-    }
-    if req.Temperature > 0 {
-        ollamaReq["temperature"] = req.Temperature
-    }
-
-    body, err := json.Marshal(ollamaReq)
-    if err != nil {
-        return GenerateResponse{}, fmt.Errorf("marshal request: %w", err)
-    }
-
-    httpReq, err := http.NewRequestWithContext(
-        ctx,
-        http.MethodPost,
-        b.baseURL+"/api/generate",
-        bytes.NewReader(body),
-    )
-    if err != nil {
-        return GenerateResponse{}, fmt.Errorf("create request: %w", err)
-    }
-    httpReq.Header.Set("Content-Type", "application/json")
-
-    resp, err := b.httpClient.Do(httpReq)
-    if err != nil {
-        return GenerateResponse{}, fmt.Errorf("execute request: %w", err)
-    }
-    defer resp.Body.Close()
-
-    if resp.StatusCode != http.StatusOK {
-        return GenerateResponse{}, fmt.Errorf("ollama returned status %d", resp.StatusCode)
-    }
-
-    var ollamaResp struct {
-        Response string `json:"response"`
-    }
-    if err := json.NewDecoder(resp.Body).Decode(&ollamaResp); err != nil {
-        return GenerateResponse{}, fmt.Errorf("decode response: %w", err)
-    }
-
-    // Convert to standard format
-    return GenerateResponse{
-        ID:      fmt.Sprintf("gen-%d", time.Now().UnixNano()),
-        Object:  "text_completion",
-        Created: time.Now().Unix(),
-        Model:   req.Model,
-        Choices: []Choice{{
-            Index:        0,
-            Text:         ollamaResp.Response,
-            FinishReason: "stop",
-        }},
-    }, nil
-}
-
-func (b *OllamaBackend) Health(ctx context.Context) error {
-    req, err := http.NewRequestWithContext(ctx, http.MethodGet, b.baseURL+"/api/tags", nil)
-    if err != nil {
-        return err
-    }
-
-    resp, err := b.httpClient.Do(req)
-    if err != nil {
-        return err
-    }
-    defer resp.Body.Close()
-
-    if resp.StatusCode != http.StatusOK {
-        return fmt.Errorf("unhealthy: status %d", resp.StatusCode)
-    }
-    return nil
-}
-\end{lstlisting}
-\end{programcode}
+The three-state model (\texttt{healthy}/\texttt{degraded}/\texttt{unhealthy}) enables smarter decisions than binary up/down. A degraded backend might still serve requests while you investigate, whereas unhealthy triggers alerts.
 
 % =============================================================================
-\section{API Server}
-\label{sec:api-server}
+\section{Request Flow}
+\label{sec:request-flow}
 % =============================================================================
 
-% TODO: HTTP API implementation
+Understanding how requests flow through the system helps with debugging and optimization.
 
-\subsection{Router Setup}
-\label{subsec:router-setup}
+\input{chapters/chapter06/diagram02}
 
-% TODO: Setting up routes
-% - POST /v1/completions
-% - POST /v1/chat/completions
-% - GET /health
-% - GET /metrics
+\subsection{Step-by-Step Flow}
+\label{subsec:request-steps}
 
-\subsection{Request Handling}
-\label{subsec:request-handling}
+\begin{enumerate}
+\item \textbf{Request Arrives}: Client sends POST to \texttt{/v1/completions} with JSON body
+\item \textbf{Middleware Chain}: Request passes through logging middleware (assigns request ID), then metrics middleware (starts timer)
+\item \textbf{Validation}: Handler validates required fields (model, prompt/messages)
+\item \textbf{Backend Call}: Request is translated to backend format and forwarded
+\item \textbf{Response Processing}: Backend response is translated to OpenAI format
+\item \textbf{Metrics Recording}: Latency histogram updated, request counter incremented
+\item \textbf{Response Sent}: JSON response returned to client
+\end{enumerate}
 
-% TODO: Middleware and handlers
-
-% =============================================================================
-\section{Metrics with Prometheus}
-\label{sec:prometheus-metrics}
-% =============================================================================
-
-% TODO: Metrics implementation
-
-\subsection{Key Metrics to Track}
-\label{subsec:key-metrics}
-
-% TODO: What to measure
-% - Request count
-% - Request latency
-% - Token throughput
-% - Error rates
-% - Backend health
-
-\begin{programcode}{Metrics Definition}
-\begin{lstlisting}[language=Go]
-// internal/metrics/metrics.go
-
-package metrics
-
-import (
-    "github.com/prometheus/client_golang/prometheus"
-    "github.com/prometheus/client_golang/prometheus/promauto"
-)
-
-var (
-    RequestsTotal = promauto.NewCounterVec(
-        prometheus.CounterOpts{
-            Name: "inference_requests_total",
-            Help: "Total number of inference requests",
-        },
-        []string{"model", "status"},
-    )
-
-    RequestDuration = promauto.NewHistogramVec(
-        prometheus.HistogramOpts{
-            Name:    "inference_request_duration_seconds",
-            Help:    "Request duration in seconds",
-            Buckets: []float64{0.1, 0.5, 1, 2, 5, 10, 30, 60},
-        },
-        []string{"model"},
-    )
-
-    TokensGenerated = promauto.NewCounterVec(
-        prometheus.CounterOpts{
-            Name: "inference_tokens_generated_total",
-            Help: "Total tokens generated",
-        },
-        []string{"model"},
-    )
-
-    BackendHealth = promauto.NewGaugeVec(
-        prometheus.GaugeOpts{
-            Name: "inference_backend_health",
-            Help: "Backend health status (1 = healthy, 0 = unhealthy)",
-        },
-        []string{"backend"},
-    )
-)
-\end{lstlisting}
-\end{programcode}
+Each step is instrumented. If something goes wrong, structured logs with the request ID let you trace the entire flow.
 
 % =============================================================================
-\section{Docker Deployment}
-\label{sec:docker-deployment}
+\section{Observability}
+\label{sec:observability}
 % =============================================================================
 
-% TODO: Docker setup
+You can't improve what you can't measure. v0.1 includes observability from day one.
 
-\subsection{Dockerfile}
-\label{subsec:dockerfile}
+\subsection{Metrics That Matter}
+\label{subsec:metrics-matter}
 
-% TODO: Multi-stage build
+We track four categories of metrics:
 
-\subsection{Docker Compose Stack}
-\label{subsec:docker-compose}
+\begin{description}
+\item[Request Volume] \texttt{inference\_requests\_total} --- Counter of requests by model and status (success/error). Answers: How busy are we? What's the error rate?
 
-\begin{programcode}{Docker Compose}
+\item[Latency] \texttt{inference\_request\_duration\_seconds} --- Histogram of request duration. Answers: What's the p50/p95/p99 latency? Are we meeting SLOs?
+
+\item[Throughput] \texttt{inference\_tokens\_generated\_total} --- Counter of tokens generated. Answers: What's our actual output? (More meaningful than request count for LLMs.)
+
+\item[Backend Health] \texttt{inference\_backend\_healthy} --- Gauge (1 = healthy, 0 = unhealthy). Answers: Is our backend up? (Useful for alerting.)
+\end{description}
+
+\subsection{Why Histograms for Latency}
+\label{subsec:why-histograms}
+
+LLM inference latency varies wildly based on prompt length, output length, and model load. A simple average hides important details. Histograms let you compute arbitrary percentiles:
+
+\begin{itemize}
+\item \textbf{p50}: Typical user experience
+\item \textbf{p95}: Experience for most users
+\item \textbf{p99}: Worst case (tail latency)
+\end{itemize}
+
+Our histogram buckets are tuned for inference: 0.1s, 0.5s, 1s, 2s, 5s, 10s, 30s, 60s. Short requests (cached, small output) hit early buckets; long generations hit later ones.
+
+\subsection{Structured Logging}
+\label{subsec:structured-logging}
+
+Every log entry includes:
+\begin{itemize}
+\item \texttt{request\_id}: UUID for tracing across components
+\item \texttt{method}: HTTP method
+\item \texttt{path}: Request path
+\item \texttt{status}: Response status code
+\item \texttt{duration\_ms}: Request duration
+\item \texttt{model}: Model name (when applicable)
+\end{itemize}
+
+JSON-formatted logs can be shipped to any log aggregator (Elasticsearch, Loki, CloudWatch).
+
+% =============================================================================
+\section{Deployment}
+\label{sec:deployment}
+% =============================================================================
+
+v0.1 deploys as a Docker Compose stack with four services. From this chapter onward, we recommend deploying to a cloud GPU provider for a consistent environment regardless of your local hardware.
+
+\subsection{Why Cloud GPUs?}
+\label{subsec:why-cloud}
+
+Running inference locally works for experimentation, but cloud GPUs provide:
+\begin{itemize}
+\item \textbf{Consistent Environment}: Same hardware, same results for all readers
+\item \textbf{Pay-per-Use}: No upfront investment in expensive hardware
+\item \textbf{Instant Scaling}: Spin up larger GPUs when needed
+\item \textbf{Production-like}: Practice deploying to real infrastructure
+\end{itemize}
+
+Appendix~\ref{ch:appendix-gpu-providers} provides detailed setup guides for AWS, GCP, Lambda Labs, RunPod, and Vast.ai. For Part I of this book, any provider with an NVIDIA GPU (16GB+ VRAM) works.
+
+\subsection{Deployment Topology}
+\label{subsec:deployment-topology}
+
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+\textbf{Service} & \textbf{Port} & \textbf{Purpose} \\
+\midrule
+control-plane & 8080 & API server (your application calls this) \\
+ollama & 11434 & Inference engine (control plane calls this) \\
+prometheus & 9090 & Metrics storage and querying \\
+grafana & 3000 & Dashboards and visualization \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The control plane is the only service your application needs to know about. Prometheus scrapes metrics from the control plane every 15 seconds. Grafana queries Prometheus to render dashboards.
+
+\subsection{Resource Requirements}
+\label{subsec:resources}
+
+For running a 7B model with v0.1:
+\begin{itemize}
+\item \textbf{Control Plane}: 128MB RAM, minimal CPU (it's just proxying)
+\item \textbf{Ollama}: 8-16GB VRAM (GPU), or 16GB+ RAM (CPU, slower)
+\item \textbf{Prometheus}: 512MB RAM (grows with metric cardinality)
+\item \textbf{Grafana}: 256MB RAM
+\end{itemize}
+
+\begin{svgraybox}
+\textbf{Recommended Cloud Instance (Part I):}
+
+A single instance with 24GB GPU (NVIDIA A10 or RTX 4090) is sufficient for all Part I exercises. Approximate cost: \$0.50-1.00/hour on budget providers. See Appendix~\ref{ch:appendix-gpu-providers} for provider-specific recommendations.
+\end{svgraybox}
+
+% =============================================================================
+\section{Running the Control Plane}
+\label{sec:running}
+% =============================================================================
+
+The complete implementation is available at:
+
+\begin{center}
+\texttt{github.com/inference-book/inference-plane}
+\end{center}
+
+\subsection{Quick Start}
+\label{subsec:quickstart}
+
 \begin{lstlisting}[language=bash]
-# deployments/docker/docker-compose.yml
+# Clone the repository
+git clone https://github.com/inference-book/inference-plane
+cd inference-plane
 
-version: '3.8'
+# Checkout v0.1
+git checkout v0.1
 
-services:
-  control-plane:
-    build:
-      context: ../..
-      dockerfile: deployments/docker/Dockerfile
-    ports:
-      - "8080:8080"
-    environment:
-      - BACKEND_URL=http://ollama:11434
-      - METRICS_PORT=9090
-    depends_on:
-      - ollama
-      - prometheus
+# Start the stack
+docker compose up -d
 
-  ollama:
-    image: ollama/ollama:latest
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+# Pull a model (first time only)
+docker compose exec ollama ollama pull llama3.2:7b
 
-  prometheus:
-    image: prom/prometheus:latest
-    ports:
-      - "9091:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
+# Verify it's working
+curl http://localhost:8080/health
+\end{lstlisting}
 
-  grafana:
-    image: grafana/grafana:latest
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning
+\subsection{Making Requests}
+\label{subsec:making-requests}
 
-volumes:
-  ollama_data:
-  prometheus_data:
-  grafana_data:
+The control plane exposes an OpenAI-compatible API:
+
+\begin{programcode}{Completion Request}
+\begin{lstlisting}[language=bash]
+curl -X POST http://localhost:8080/v1/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "llama3.2:7b",
+    "prompt": "Explain inference in one sentence:",
+    "max_tokens": 50
+  }'
 \end{lstlisting}
 \end{programcode}
 
-% =============================================================================
-\section{Grafana Dashboard}
-\label{sec:grafana-dashboard}
-% =============================================================================
+Response follows OpenAI format:
 
-% TODO: Dashboard creation
-% - Request rate panel
-% - Latency percentiles
-% - Error rate
-% - Token throughput
-% - Backend health
-
-% =============================================================================
-\section{Testing the Control Plane}
-\label{sec:testing-control-plane}
-% =============================================================================
-
-% TODO: Integration testing
-% - Starting the stack
-% - Making test requests
-% - Verifying metrics
-% - Checking dashboards
-
-% =============================================================================
-\section{Configuration Management}
-\label{sec:configuration}
-% =============================================================================
-
-% TODO: Config file and environment variables
-
-\begin{programcode}{Configuration}
-\begin{lstlisting}[language=Go]
-// internal/config/config.go
-
-package config
-
-type Config struct {
-    Server  ServerConfig  `yaml:"server"`
-    Backend BackendConfig `yaml:"backend"`
-    Metrics MetricsConfig `yaml:"metrics"`
-}
-
-type ServerConfig struct {
-    Host string `yaml:"host" env:"SERVER_HOST" default:"0.0.0.0"`
-    Port int    `yaml:"port" env:"SERVER_PORT" default:"8080"`
-}
-
-type BackendConfig struct {
-    Type    string `yaml:"type" env:"BACKEND_TYPE" default:"ollama"`
-    URL     string `yaml:"url" env:"BACKEND_URL" default:"http://localhost:11434"`
-    Model   string `yaml:"model" env:"BACKEND_MODEL" default:"llama3.2:7b"`
-    Timeout int    `yaml:"timeout" env:"BACKEND_TIMEOUT" default:"300"`
-}
-
-type MetricsConfig struct {
-    Enabled bool   `yaml:"enabled" env:"METRICS_ENABLED" default:"true"`
-    Path    string `yaml:"path" env:"METRICS_PATH" default:"/metrics"`
+\begin{lstlisting}[language=bash]
+{
+  "id": "gen-1234567890",
+  "object": "text_completion",
+  "created": 1703001234,
+  "model": "llama3.2:7b",
+  "choices": [{
+    "index": 0,
+    "text": "Inference is the process of using a trained model...",
+    "finish_reason": "stop"
+  }],
+  "usage": {
+    "prompt_tokens": 8,
+    "completion_tokens": 42,
+    "total_tokens": 50
+  }
 }
 \end{lstlisting}
-\end{programcode}
+
+\subsection{Viewing Metrics}
+\label{subsec:viewing-metrics}
+
+After making some requests, check the metrics:
+
+\begin{lstlisting}[language=bash]
+# Raw Prometheus metrics
+curl http://localhost:8080/metrics | grep inference_
+
+# Open Grafana dashboard
+open http://localhost:3000  # admin/admin
+\end{lstlisting}
+
+The repository includes a pre-configured Grafana dashboard showing request rate, latency percentiles, and error rate.
+
+% =============================================================================
+\section{Implementation Notes}
+\label{sec:implementation-notes}
+% =============================================================================
+
+A few design decisions worth highlighting:
+
+\subsection{Why Go?}
+\label{subsec:why-go}
+
+\begin{itemize}
+\item \textbf{Single Binary}: No runtime dependencies, easy deployment
+\item \textbf{Fast Startup}: Sub-second cold start (important for scaling)
+\item \textbf{Low Memory}: Control plane uses ~20MB RSS
+\item \textbf{Excellent HTTP}: Standard library handles HTTP efficiently
+\item \textbf{Concurrency}: Goroutines handle many concurrent requests naturally
+\end{itemize}
+
+The patterns in this book translate to other languages. A Python (FastAPI) or Rust (Axum) implementation would use the same abstractions.
+
+\subsection{Configuration Hierarchy}
+\label{subsec:config-hierarchy}
+
+Configuration loads in order (later overrides earlier):
+\begin{enumerate}
+\item Compiled defaults
+\item YAML config file (\texttt{config.yaml})
+\item Environment variables (prefixed with \texttt{CP\_})
+\end{enumerate}
+
+This allows: sensible defaults for development, file-based config for staging, environment variables for production (12-factor app style).
+
+\subsection{Error Handling}
+\label{subsec:error-handling}
+
+Backend errors are translated to appropriate HTTP status codes:
+\begin{itemize}
+\item Backend timeout → 504 Gateway Timeout
+\item Backend unavailable → 503 Service Unavailable
+\item Invalid request → 400 Bad Request
+\item Backend error → 502 Bad Gateway
+\end{itemize}
+
+Error responses include a structured JSON body with error details, making client-side handling straightforward.
+
+% =============================================================================
+\section{What's Next}
+\label{sec:whats-next}
+% =============================================================================
+
+v0.1 is a foundation. Here's how it evolves:
+
+\begin{svgraybox}
+\textbf{Control Plane Evolution:}
+\begin{description}
+\item[v0.1 (This Chapter)] Single backend, metrics, health checks
+\item[v0.2 (Part II)] Authentication, rate limiting, caching
+\item[v0.3 (Part III)] Multi-tenant, billing, multiple backends
+\item[v1.0 (Part IV)] Production-hardened, distributed, auto-scaling
+\end{description}
+\end{svgraybox}
+
+Each version builds on the previous. The \texttt{Backend} interface you learned here remains unchanged---new backends (vLLM, TensorRT-LLM) simply implement the same interface.
 
 % =============================================================================
 \section{Summary}
-\label{sec:ch05-summary}
+\label{sec:ch06-summary}
 % =============================================================================
 
 \begin{important}{Key Takeaways}
 \begin{itemize}
-\item Control Plane v0.1 provides abstraction over inference backends
-\item Interface-driven design enables future extensibility
-\item Observability (metrics + health checks) is built-in from day one
-\item Docker Compose provides a complete development environment
-\item This foundation will evolve throughout the book
+\item A control plane separates policy (how requests are handled) from computation (inference)
+\item The \texttt{Backend} interface abstracts inference engines, enabling swappable backends
+\item OpenAI-compatible API means existing tools and SDKs work immediately
+\item Observability (metrics, logging, health checks) is built in from day one
+\item v0.1 is minimal by design---complexity is added incrementally in later chapters
 \end{itemize}
 \end{important}
 
 \begin{svgraybox}
-\textbf{What's Next:}
+\textbf{Repository Reference:}
 
-In the optional Chapter 5.5, we'll add browser-based inference for zero-cost deployments. In Part II, we'll enhance this control plane with authentication, rate limiting, caching, and multi-model routing for 30B+ production deployments.
+The complete v0.1 implementation, including Dockerfile, Docker Compose, Grafana dashboards, and tests, is available at:
+
+\texttt{github.com/inference-book/inference-plane}
+
+Clone it, run it, modify it. The code is Apache 2.0 licensed.
 \end{svgraybox}
 
 % =============================================================================
@@ -564,21 +519,27 @@ In the optional Chapter 5.5, we'll add browser-based inference for zero-cost dep
 % =============================================================================
 
 \begin{prob}
-\label{prob:ch05-vllm-backend}
+\label{prob:ch06-vllm-backend}
 \textbf{vLLM Backend Implementation}\\
-Implement a \texttt{VLLMBackend} struct that satisfies the \texttt{Backend} interface. It should communicate with vLLM's OpenAI-compatible API.
+Implement a backend that connects to vLLM's OpenAI-compatible API. Since vLLM already speaks OpenAI format, this should be simpler than the Ollama backend. What translation is still needed?
 \end{prob}
 
 \begin{prob}
-\label{prob:ch05-streaming}
+\label{prob:ch06-streaming}
 \textbf{Streaming Support}\\
-Extend the \texttt{Backend} interface to support streaming responses. Implement streaming for the Ollama backend.
+Extend the control plane to support streaming responses (Server-Sent Events). You'll need to: (a) detect when the client wants streaming, (b) proxy the stream from the backend, (c) update metrics to handle streaming responses.
 \end{prob}
 
 \begin{prob}
-\label{prob:ch05-dashboard}
-\textbf{Custom Grafana Dashboard}\\
-Create a Grafana dashboard that displays: (a) request rate over time, (b) p50/p95/p99 latency, (c) tokens per second, and (d) error rate. Export the dashboard as JSON.
+\label{prob:ch06-multi-model}
+\textbf{Model Routing (Preview)}\\
+Modify the control plane to support multiple models on the same Ollama backend. The request's \texttt{model} field should be passed through to Ollama. Add a metric label for model name.
+\end{prob}
+
+\begin{prob}
+\label{prob:ch06-dashboard}
+\textbf{Custom Dashboard}\\
+Create a Grafana dashboard that shows: (a) requests per minute over time, (b) p50/p95/p99 latency, (c) tokens per second, (d) error rate percentage. Export as JSON and submit.
 \end{prob}
 
 \input{chapters/chapter06/references}
