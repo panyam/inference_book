@@ -58,7 +58,7 @@ When you load a Llama model:
 
 This is why llama.cpp, vLLM, and Hugging Face Transformers each implement their own model architectures. They all load the same weights, but each has code that knows ``Llama uses RoPE embeddings, GQA attention, and SwiGLU activation.''
 
-\todo{Can we point to the code somewhere on github and add as reference/citation}
+For concrete examples, see llama.cpp's Llama implementation\footnote{\url{https://github.com/ggerganov/llama.cpp/blob/master/src/llama.cpp}} or Hugging Face's LlamaModel class\footnote{\url{https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py}}. Both load identical weights but implement the forward pass differently.
 
 \paragraph{Graph-Embedded Formats: Self-Describing Models}
 
@@ -256,9 +256,26 @@ SafeTensors is the format for the Hugging Face ecosystem. When you:
 \item Fine-tune models with PEFT or similar tools
 \end{itemize}
 
-You're working with SafeTensors. The format stores weights at their original precision (typically FP16 or BF16). For quantized inference, you'll either apply quantization at load time (using BitsAndBytes or AutoGPTQ) or download a pre-quantized version in GGUF format.
+You're working with SafeTensors. The format stores weights at their original precision (typically FP16 or BF16), which is essential for training where gradient updates require full precision. SafeTensors also supports efficient partial loading---training frameworks can load and update specific layers without reading the entire model.
 
-\todo{Example/Sample code for loading/using a SafeGTensor model}
+For quantized inference, you'll either apply quantization at load time (using BitsAndBytes or AutoGPTQ) or download a pre-quantized version in GGUF format.
+
+\begin{lstlisting}[language=Python, caption={Loading a SafeTensors model with Hugging Face Transformers.}]
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+# SafeTensors is the default format - just load by model name
+model = AutoModelForCausalLM.from_pretrained(
+    "Qwen/Qwen2.5-7B-Instruct",
+    torch_dtype="auto",        # Auto-select FP16/BF16
+    device_map="auto"          # Auto-distribute across GPUs
+)
+tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-7B-Instruct")
+
+# Generate
+inputs = tokenizer("Hello, how are you?", return_tensors="pt").to(model.device)
+outputs = model.generate(**inputs, max_new_tokens=50)
+print(tokenizer.decode(outputs[0]))
+\end{lstlisting}
 
 \subsection{GGUF (GPT-Generated Unified Format)}
 \label{subsec:gguf}
@@ -301,8 +318,9 @@ GGUF is the format of choice when:
 \item Deploying on CPU or hybrid CPU/GPU systems
 \item Using quantized models (Q4, Q5, Q8 variants)
 \item Needing simple, single-file deployment
-\item Running on Apple Silicon (Metal support)
 \end{itemize}
+
+GGUF runs well on all platforms---x86 CPU, NVIDIA GPU (CUDA), AMD GPU (ROCm), and Apple Silicon (Metal). Apple Silicon deserves mention because llama.cpp's Metal backend leverages the unified memory architecture particularly well: no CPU-to-GPU copies are needed since both share the same memory. This makes Apple Silicon an excellent development platform for GGUF models.
 
 The format's tight integration with llama.cpp's quantization system means GGUF models often achieve better quality-per-bit than other quantization methods, particularly for CPU inference.
 
@@ -335,7 +353,7 @@ ONNX takes a different approach than SafeTensors or GGUF:
 \item \textbf{Operator versioning}: Explicit version numbers for backward compatibility
 \end{itemize}
 
-The Protobuf encoding trades mmap efficiency for flexibility and cross-platform compatibility. This matters less for smaller models but can impact loading times for 7B+ parameter models.
+The Protobuf encoding trades mmap efficiency for flexibility and cross-platform compatibility. This matters less for smaller models but can impact loading times for 7B+ parameter models. In practice, ONNX addresses this with ``external data''---storing large tensors in separate binary files that can be memory-mapped, while keeping the graph structure in the Protobuf file. For LLM deployment, most practitioners avoid ONNX entirely in favor of GGUF or SafeTensors with native inference engines.
 
 \paragraph{When You'll Use ONNX}
 
@@ -352,7 +370,7 @@ For LLM inference specifically, ONNX is less common than SafeTensors or GGUF. Th
 \subsection{Format Comparison}
 \label{subsec:format-comparison}
 
-The following table summarizes how each format implements our design principles:
+The following table summarizes how each format implements our design principles. For detailed specifications, see the official documentation for SafeTensors~\cite{safetensors2023}, GGUF~\cite{gguf2023}, and ONNX~\cite{onnx2024}.
 
 \begin{table}[htbp]
 \centering
@@ -638,7 +656,7 @@ With format and quantization decisions understood, the next question is: which m
 \subsection{Model Families Overview}
 \label{subsec:model-families}
 
-As of late 2024, several model families dominate the open-weight landscape:
+As of late 2025, several model families dominate the open-weight landscape. The ecosystem evolves rapidly---check release notes and benchmarks for the latest versions.
 
 \paragraph{Llama (Meta)}
 
@@ -746,6 +764,8 @@ Research/Analysis & 33B & 70B+ & Llama 3.1 70B \\
 \end{tabular}
 \end{table}
 
+These recommendations reflect community experience and benchmark trends as of late 2025. For coding tasks specifically, closed-source models (Claude, GPT-4) still lead on complex generation, but open models like Qwen 2.5 Coder and DeepSeek Coder have narrowed the gap significantly for many practical use cases. Always benchmark on your specific tasks---the ``best'' model depends heavily on your domain.
+
 \begin{table}[htbp]
 \centering
 \caption{Hardware requirements by model size (Q4 quantization).}
@@ -773,7 +793,7 @@ Model discovery has become easier as the ecosystem has matured. Two primary sour
 \subsection{Hugging Face Hub}
 \label{subsec:huggingface-hub}
 
-Hugging Face Hub is the central repository for open models~\cite{huggingface2024}. With over 500,000 models (as of late 2024), navigation skills are essential.
+Hugging Face Hub is the central repository for open models~\cite{huggingface2024}. With over 2 million models (as of late 2025, up from 500,000 in 2024), navigation skills are essential.
 
 \paragraph{Finding Models}
 
@@ -815,9 +835,9 @@ Ollama maintains a curated collection of models ready for immediate use~\cite{ol
 \paragraph{Advantages}
 
 \begin{itemize}
-\item \textbf{One-command deployment}: \texttt{ollama run llama3.2:7b}
+\item \textbf{One-command deployment}: \texttt{ollama run qwen2.5:7b}
 \item \textbf{Automatic quantization selection}: Downloads appropriate variant for your hardware
-\item \textbf{Version management}: \texttt{ollama pull llama3.2:7b-q4\_K\_M}
+\item \textbf{Version management}: \texttt{ollama pull qwen2.5:7b-q4\_K\_M}
 \item \textbf{Pre-configured system prompts}: Instruct variants ready for chat
 \end{itemize}
 
@@ -929,7 +949,7 @@ This chapter covered the practical decisions involved in selecting and preparing
 
 The model registry concept introduced here becomes part of your control plane, tracking which models are available, their resource requirements, and their capabilities. This metadata drives routing decisions when you support multiple models.
 
-With models selected and ready, Chapter~\ref{ch:inference-engines} introduces the software that actually runs them: inference engines like Ollama, llama.cpp, and vLLM. Each engine has different strengths---simplicity, flexibility, or production performance---and choosing the right one depends on your deployment scenario.
+With models selected and ready, the next chapter introduces the software that actually runs them: inference engines like Ollama, llama.cpp, and vLLM. Each engine has different strengths---simplicity, flexibility, or production performance---and choosing the right one depends on your deployment scenario.
 
 \begin{important}{Key Takeaways}
 \begin{itemize}
