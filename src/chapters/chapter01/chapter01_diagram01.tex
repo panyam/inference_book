@@ -1,0 +1,35 @@
+% Diagram: Training Loop
+% Used in: Chapter 1, Section 1.1.1 (What Happens During Training)
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    node distance=1.5cm,
+    box/.style={rectangle, draw, minimum width=2.5cm, minimum height=0.8cm, align=center},
+    arrow/.style={->, >=stealth, thick}
+]
+    % Nodes
+    \node[box] (input) {Input Tokens};
+    \node[box, right=of input] (network) {Neural Network\\(7B parameters)};
+    \node[box, right=of network] (pred) {Predicted\\Token};
+    \node[box, below=of pred] (actual) {Actual Token};
+    \node[box, below=of network] (loss) {Loss};
+    \node[box, below=of input] (grad) {Gradients};
+
+    % Forward pass (top)
+    \draw[arrow, blue] (input) -- node[above, font=\small] {Forward} (network);
+    \draw[arrow, blue] (network) -- (pred);
+
+    % Loss calculation
+    \draw[arrow] (pred) -- (loss);
+    \draw[arrow] (actual) -- (loss);
+
+    % Backward pass
+    \draw[arrow, red] (loss) -- node[below, font=\small] {Backward} (grad);
+    \draw[arrow, red, dashed] (grad) -- node[left, font=\small, align=center] {Update\\weights} (network);
+
+    % Loop indicator
+    \draw[arrow, thick, dotted] (grad.west) -- ++(-0.5,0) |- node[left, font=\small, pos=0.25] {Repeat} (input.west);
+\end{tikzpicture}
+\caption{The training loop. Each iteration performs a forward pass (blue) to generate predictions, computes the loss against actual targets, then propagates gradients backward (red) to update model weights. Training Llama 2 70B required approximately 1.7 million GPU hours of this loop.}
+\label{fig:training-loop}
+\end{figure}
