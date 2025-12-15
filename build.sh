@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Build script for Self-Hosted AI Inference book
+# Build script for the book
 # Generates PDFs in ./gen folder
 #
 # Usage:
@@ -69,10 +69,16 @@ build_full_book() {
 # Function to build a single chapter as standalone PDF
 build_chapter() {
     local chapter_name=$1
-    local chapter_file="chapters/${chapter_name}.tex"
+    local chapter_file=""
 
-    if [ ! -f "${SRC_DIR}/${chapter_file}" ]; then
-        print_error "Chapter file not found: ${chapter_file}"
+    # Check for new folder structure first (chapters/chapterXX/index.tex)
+    if [ -f "${SRC_DIR}/chapters/${chapter_name}/index.tex" ]; then
+        chapter_file="chapters/${chapter_name}/index.tex"
+    # Fall back to old structure (chapters/chapterXX.tex)
+    elif [ -f "${SRC_DIR}/chapters/${chapter_name}.tex" ]; then
+        chapter_file="chapters/${chapter_name}.tex"
+    else
+        print_error "Chapter file not found: chapters/${chapter_name}/index.tex or chapters/${chapter_name}.tex"
         return 1
     fi
 
@@ -118,10 +124,22 @@ build_chapter() {
 build_all_chapters() {
     print_status "Building all chapters individually..."
 
+    # Build chapters with new folder structure (chapters/chapterXX/index.tex)
+    for chapter_dir in "${SRC_DIR}"/chapters/chapter*/; do
+        if [ -d "$chapter_dir" ] && [ -f "${chapter_dir}index.tex" ]; then
+            chapter_name=$(basename "$chapter_dir")
+            build_chapter "$chapter_name"
+        fi
+    done
+
+    # Build chapters with old structure (chapters/chapterXX.tex)
     for chapter_file in "${SRC_DIR}"/chapters/chapter*.tex; do
         if [ -f "$chapter_file" ]; then
             chapter_name=$(basename "$chapter_file" .tex)
-            build_chapter "$chapter_name"
+            # Skip if already built from folder structure
+            if [ ! -d "${SRC_DIR}/chapters/${chapter_name}" ]; then
+                build_chapter "$chapter_name"
+            fi
         fi
     done
 
