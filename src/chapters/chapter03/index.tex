@@ -7,9 +7,9 @@
 \chapter{Hardware Fundamentals}
 \label{ch:hardware-fundamentals}
 
-\abstract*{Understanding hardware is essential for making informed decisions about self-hosted inference. This chapter covers how transformers use memory during inference, VRAM calculation formulas, CPU vs GPU trade-offs, and a comprehensive comparison of available hardware options. We also analyze the economics of owned versus rented infrastructure to help you make the right choice for your situation.}
+\abstract*{Understanding hardware is essential for making informed decisions about LLM inference and serving. This chapter covers how transformers use memory during inference, VRAM calculation formulas, CPU vs GPU trade-offs, and a comprehensive comparison of available hardware options. We also analyze the economics of owned versus rented infrastructure to help you make the right choice for your situation.}
 
-\abstract{Understanding hardware is essential for making informed decisions about self-hosted inference. This chapter covers how transformers use memory during inference, VRAM calculation formulas, CPU vs GPU trade-offs, and a comprehensive comparison of available hardware options. We also analyze the economics of owned versus rented infrastructure to help you make the right choice for your situation.}
+\abstract{Understanding hardware is essential for making informed decisions about LLM inference. This chapter covers how transformers use memory during inference, VRAM calculation formulas, CPU vs GPU trade-offs, and a comprehensive comparison of available hardware options. We also analyze the economics of owned versus rented infrastructure to help you make the right choice for your situation.}
 
 % Note: Model/Transformer fundamentals are now covered in Chapter 2 (How LLMs Work)
 
@@ -725,7 +725,7 @@ If you're deploying on GCP with JAX models, see Appendix~\ref{ch:appendix-tpu} f
 \label{sec:ch03-summary}
 % =============================================================================
 
-This chapter established the hardware foundations for self-hosted inference. We began with transformer memory architecture---understanding that model weights, KV cache, and activation memory compete for finite GPU resources. The VRAM calculation framework lets you predict memory requirements for any model before attempting to run it.
+This chapter established the hardware foundations for LLM inference. We began with transformer memory architecture---understanding that model weights, KV cache, and activation memory compete for finite GPU resources. The VRAM calculation framework lets you predict memory requirements for any model before attempting to run it.
 
 We explored the CPU vs GPU trade-off, finding that GPU inference offers 10--50x speedups but requires careful memory planning. Hybrid approaches that offload some layers to CPU can bridge the gap when VRAM is insufficient for full GPU inference.
 
@@ -768,4 +768,4 @@ You need to serve a 7B model 24/7. Calculate the break-even point (in months) be
 A startup needs to serve 1000 requests/hour with a 7B model. They have a budget of \$5,000. Recommend a hardware configuration and justify your choice, considering both owned and rented options.
 \end{prob}
 
-\input{chapters/references03}
+\input{chapters/chapter03/references}
