@@ -44,7 +44,7 @@ Training a large language model involves adjusting billions of numerical paramet
 \item \textbf{Backward pass}: The error propagates backward through the network via gradient descent, slightly adjusting each parameter to reduce future errors.
 \end{enumerate}
 
-\input{chapters/chapter01/chapter01_diagram01}
+\input{chapters/chapter01/diagram01}
 
 The backward pass is the expensive part. It requires storing intermediate activations from the forward pass (consuming memory) and computing gradients for every parameter (consuming compute). For a 7B parameter model, this means computing and storing 7 billion gradients per training step.
 
@@ -67,7 +67,7 @@ The resource profile differs substantially from training:
 
 The KV cache deserves attention because it's often the limiting factor for long-context inference. During generation, the model caches intermediate computations (keys and values from the attention mechanism) to avoid redundant work. For a 7B model with a 4096-token context, the KV cache consumes approximately 1GB of memory at FP16 precision. At 128K context length, that grows to roughly 32GB---potentially exceeding the model weights themselves. Chapter~\ref{ch:hardware-fundamentals} covers memory calculations in detail.
 
-\input{chapters/chapter01/chapter01_diagram02}
+\input{chapters/chapter01/diagram02}
 
 A single inference request on a 7B model takes 10--100 milliseconds for the first token (depending on prompt length) and 20--50 milliseconds per subsequent token on a modern consumer GPU. This is the timescale you'll work with throughout this book: milliseconds per token, not months per training run.
 
