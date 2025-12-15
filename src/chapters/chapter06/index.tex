@@ -89,7 +89,7 @@ In networking, a \emph{control plane} handles configuration and policy decisions
 \begin{description}
 \item[Backend Abstraction] Your application talks to the control plane using a standard API (OpenAI-compatible). The control plane translates to whatever backend you're running.
 \item[Centralized Policy] Authentication, rate limiting, caching, and logging happen in one place. Change policy without touching application code.
-\item[Observability] Every request is measured. Latency histograms, error rates, token throughput---all available in Prometheus and Grafana.
+\item[Observability] Every request is measured. Latency histograms, error rates, token throughput---all available via OpenTelemetry, exportable to Grafana, Prometheus, or any OTLP-compatible backend.
 \item[Resilience] Health checks detect backend failures. Future versions will add failover, retries, and circuit breakers.
 \end{description}
 
@@ -111,7 +111,7 @@ Control Plane v0.1 is intentionally minimal---enough to be useful while establis
 \item \textbf{Single Backend Proxy}: Routes all requests to one Ollama instance
 \item \textbf{OpenAI-Compatible API}: \texttt{/v1/completions} and \texttt{/v1/chat/completions} endpoints
 \item \textbf{Health Endpoint}: \texttt{/health} returns backend status
-\item \textbf{Prometheus Metrics}: Request count, latency histogram, error rate
+\item \textbf{OpenTelemetry Observability}: Metrics, traces, and structured logs
 \item \textbf{Structured Logging}: JSON logs with request IDs for tracing
 \item \textbf{Configuration}: YAML file with environment variable overrides
 \end{itemize}
@@ -138,7 +138,7 @@ The control plane consists of five components:
 \item[API Server] HTTP server exposing OpenAI-compatible endpoints. Accepts requests, validates input, forwards to backend proxy.
 \item[Backend Proxy] Translates OpenAI API format to backend-specific format (Ollama, vLLM). Handles response conversion.
 \item[Health Checker] Periodically probes backend health. Exposes aggregated status via \texttt{/health}.
-\item[Metrics Collector] Records request metrics (count, latency, tokens). Exposes Prometheus endpoint at \texttt{/metrics}.
+\item[Telemetry] Records metrics, traces, and logs via OpenTelemetry. Exports to configured backends (Grafana, Jaeger, etc.).
 \item[Configuration] Loads settings from YAML and environment variables. Provides typed access to config values.
 \end{description}
 
@@ -239,7 +239,19 @@ Each step is instrumented. If something goes wrong, structured logs with the req
 \label{sec:observability}
 % =============================================================================
 
-You can't improve what you can't measure. v0.1 includes observability from day one.
+You can't improve what you can't measure. v0.1 includes observability from day one using OpenTelemetry.
+
+\subsection{Why OpenTelemetry}
+\label{subsec:why-otel}
+
+OpenTelemetry (OTel) is the industry standard for observability, providing unified APIs for metrics, traces, and logs. We use it throughout this book because:
+
+\begin{description}
+\item[Vendor Neutral] Export to any backend---Prometheus, Grafana, Jaeger, Datadog, or cloud-native options. Switch providers without changing code.
+\item[Unified SDK] One library for metrics, traces, and logs. Correlation between them is automatic.
+\item[Distributed Tracing] Essential as we add multiple backends, caching, and queues in later chapters. Trace requests across services.
+\item[Industry Standard] Supported by all major cloud providers and observability vendors. Skills transfer everywhere.
+\end{description}
 
 \subsection{Metrics That Matter}
 \label{subsec:metrics-matter}
@@ -247,14 +259,27 @@ You can't improve what you can't measure. v0.1 includes observability from day o
 We track four categories of metrics:
 
 \begin{description}
-\item[Request Volume] \texttt{inference\_requests\_total} --- Counter of requests by model and status (success/error). Answers: How busy are we? What's the error rate?
+\item[Request Volume] \texttt{inference.requests.total} --- Counter of requests by model and status (success/error). Answers: How busy are we? What's the error rate?
 
-\item[Latency] \texttt{inference\_request\_duration\_seconds} --- Histogram of request duration. Answers: What's the p50/p95/p99 latency? Are we meeting SLOs?
+\item[Latency] \texttt{inference.request.duration} --- Histogram of request duration. Answers: What's the p50/p95/p99 latency? Are we meeting SLOs?
 
-\item[Throughput] \texttt{inference\_tokens\_generated\_total} --- Counter of tokens generated. Answers: What's our actual output? (More meaningful than request count for LLMs.)
+\item[Throughput] \texttt{inference.tokens.generated} --- Counter of tokens generated. Answers: What's our actual output? (More meaningful than request count for LLMs.)
 
-\item[Backend Health] \texttt{inference\_backend\_healthy} --- Gauge (1 = healthy, 0 = unhealthy). Answers: Is our backend up? (Useful for alerting.)
+\item[Backend Health] \texttt{inference.backend.healthy} --- Gauge (1 = healthy, 0 = unhealthy). Answers: Is our backend up? (Useful for alerting.)
 \end{description}
+
+\subsection{Distributed Tracing}
+\label{subsec:distributed-tracing}
+
+Every request gets a trace ID that follows it through the system. In v0.1 this seems like overkill---there's only one backend. But as we add caching, queues, and multiple backends, traces become essential for debugging.
+
+Each trace contains spans showing:
+\begin{itemize}
+\item Time spent in middleware (auth, rate limiting)
+\item Time spent waiting in queue
+\item Time spent in backend inference
+\item Time spent in response processing
+\end{itemize}
 
 \subsection{Why Histograms for Latency}
 \label{subsec:why-histograms}
@@ -274,7 +299,8 @@ Our histogram buckets are tuned for inference: 0.1s, 0.5s, 1s, 2s, 5s, 10s, 30s,
 
 Every log entry includes:
 \begin{itemize}
-\item \texttt{request\_id}: UUID for tracing across components
+\item \texttt{trace\_id}: OpenTelemetry trace ID for correlation
+\item \texttt{span\_id}: Current span within the trace
 \item \texttt{method}: HTTP method
 \item \texttt{path}: Request path
 \item \texttt{status}: Response status code
@@ -282,7 +308,7 @@ Every log entry includes:
 \item \texttt{model}: Model name (when applicable)
 \end{itemize}
 
-JSON-formatted logs can be shipped to any log aggregator (Elasticsearch, Loki, CloudWatch).
+JSON-formatted logs with trace context can be shipped to any log aggregator (Loki, Elasticsearch, CloudWatch) and correlated with traces.
 
 % =============================================================================
 \section{Deployment}
@@ -314,13 +340,13 @@ Appendix~\ref{ch:appendix-gpu-providers} provides detailed setup guides for AWS,
 \midrule
 control-plane & 8080 & API server (your application calls this) \\
 ollama & 11434 & Inference engine (control plane calls this) \\
-prometheus & 9090 & Metrics storage and querying \\
-grafana & 3000 & Dashboards and visualization \\
+otel-collector & 4317 & OpenTelemetry collector (receives OTLP) \\
+grafana & 3000 & Dashboards, metrics, traces, logs \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-The control plane is the only service your application needs to know about. Prometheus scrapes metrics from the control plane every 15 seconds. Grafana queries Prometheus to render dashboards.
+The control plane is the only service your application needs to know about. It exports telemetry via OTLP to the OpenTelemetry Collector, which routes metrics to Prometheus, traces to Tempo, and logs to Loki---all visualized in Grafana.
 
 \subsection{Resource Requirements}
 \label{subsec:resources}
@@ -329,8 +355,7 @@ For running a 7B model with v0.1:
 \begin{itemize}
 \item \textbf{Control Plane}: 128MB RAM, minimal CPU (it's just proxying)
 \item \textbf{Ollama}: 8-16GB VRAM (GPU), or 16GB+ RAM (CPU, slower)
-\item \textbf{Prometheus}: 512MB RAM (grows with metric cardinality)
-\item \textbf{Grafana}: 256MB RAM
+\item \textbf{OTel Collector + Backends}: 512MB RAM (Grafana stack)
 \end{itemize}
 
 \begin{svgraybox}
@@ -409,20 +434,22 @@ Response follows OpenAI format:
 }
 \end{lstlisting}
 
-\subsection{Viewing Metrics}
-\label{subsec:viewing-metrics}
+\subsection{Viewing Telemetry}
+\label{subsec:viewing-telemetry}
 
-After making some requests, check the metrics:
+After making some requests, explore your observability data:
 
 \begin{lstlisting}[language=bash]
-# Raw Prometheus metrics
-curl http://localhost:8080/metrics | grep inference_
-
-# Open Grafana dashboard
+# Open Grafana (includes dashboards for metrics, traces, logs)
 open http://localhost:3000  # admin/admin
+
+# Pre-configured dashboards:
+# - Inference Overview: request rate, latency, errors
+# - Traces: distributed request tracing
+# - Logs: structured log exploration
 \end{lstlisting}
 
-The repository includes a pre-configured Grafana dashboard showing request rate, latency percentiles, and error rate.
+The repository includes pre-configured Grafana dashboards and datasources for the full observability stack.
 
 % =============================================================================
 \section{Implementation Notes}
@@ -498,7 +525,7 @@ Each version builds on the previous. The \texttt{Backend} interface you learned 
 \item A control plane separates policy (how requests are handled) from computation (inference)
 \item The \texttt{Backend} interface abstracts inference engines, enabling swappable backends
 \item OpenAI-compatible API means existing tools and SDKs work immediately
-\item Observability (metrics, logging, health checks) is built in from day one
+\item Observability via OpenTelemetry (metrics, traces, logs) is built in from day one
 \item v0.1 is minimal by design---complexity is added incrementally in later chapters
 \end{itemize}
 \end{important}

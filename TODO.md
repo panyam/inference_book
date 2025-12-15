@@ -865,6 +865,8 @@ The patterns, code, and architecture apply equally to all deployment models.
 - **Infrastructure agnostic** - cloud and local treated equally throughout
 - **Primary model family: Qwen** (Alibaba) - active development, Apache 2.0, good range of sizes
 - **Appendix for European alternative** - Mistral models for EU-based readers
+- **OpenTelemetry for all observability** - unified metrics, traces, logs; vendor-neutral; exports to Prometheus/Grafana/Jaeger/etc.
+- **Cloud GPU providers recommended** - RunPod as default, with guides for Lambda Labs, Vast.ai, AWS, GCP
 
 ---
 

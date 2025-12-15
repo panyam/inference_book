@@ -243,7 +243,7 @@ inference-control-plane/
 
 1. **Interface Segregation** - Each capability is an interface
 2. **Dependency Injection** - Control plane composes interfaces
-3. **Observability Built-In** - Every interface has metrics
+3. **Observability Built-In** - Every interface has OpenTelemetry metrics, traces, and logs
 4. **Configuration Over Code** - Feature flags enable capabilities
 5. **Backward Compatibility** - New interfaces don't break old ones
 
@@ -588,8 +588,8 @@ Time: 30 minutes
    - Graceful shutdown
    
 4. Add observability
-   - Prometheus metrics
-   - Structured logging
+   - OpenTelemetry (metrics, traces, logs)
+   - Structured logging with trace correlation
    - Health checks
    
 5. Deployment
@@ -1079,8 +1079,8 @@ Time: 30 minutes
    - Upgrades
    
 2. Monitoring comprehensive
-   - Key metrics
-   - Alerting
+   - OpenTelemetry metrics, traces, logs
+   - Alerting (Grafana, PagerDuty)
    - On-call procedures
    - SLO/SLI definitions
    

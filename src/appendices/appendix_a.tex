@@ -179,52 +179,150 @@ type BackendConfig struct {
 \end{programcode}
 
 % =============================================================================
-\section{Metrics}
-\label{sec:metrics-ref}
+\section{Observability with OpenTelemetry}
+\label{sec:otel-ref}
 % =============================================================================
 
-The control plane exposes Prometheus metrics for monitoring and alerting.
+The control plane uses OpenTelemetry for unified observability---metrics, traces, and logs through a single SDK. OpenTelemetry is vendor-neutral: export to Prometheus, Jaeger, Grafana, Datadog, or any OTLP-compatible backend.
 
-\begin{programcode}{Core Metrics}
+\subsection{Telemetry Provider Setup}
+\label{subsec:otel-setup}
+
+\begin{programcode}{OpenTelemetry Initialization}
 \begin{lstlisting}[language=Go]
-// Metrics registered with Prometheus.
-var (
-    // RequestsTotal counts requests by model and status.
-    RequestsTotal = prometheus.NewCounterVec(
-        prometheus.CounterOpts{
-            Name: "inference_requests_total",
-            Help: "Total inference requests",
-        },
-        []string{"model", "status"},
+// InitTelemetry sets up OpenTelemetry with OTLP export.
+func InitTelemetry(ctx context.Context, serviceName string) (func(), error) {
+    // Resource identifies this service in telemetry backends
+    res, err := resource.New(ctx,
+        resource.WithAttributes(
+            semconv.ServiceName(serviceName),
+            semconv.ServiceVersion("0.1.0"),
+        ),
     )
+    if err != nil {
+        return nil, err
+    }
 
-    // RequestDuration tracks latency distribution.
-    RequestDuration = prometheus.NewHistogramVec(
-        prometheus.HistogramOpts{
-            Name:    "inference_request_duration_seconds",
-            Help:    "Request duration in seconds",
-            Buckets: []float64{0.1, 0.5, 1, 2, 5, 10, 30, 60},
-        },
-        []string{"model"},
+    // Metrics: OTLP exporter (works with Prometheus, Grafana, etc.)
+    metricExporter, err := otlpmetricgrpc.New(ctx)
+    if err != nil {
+        return nil, err
+    }
+    meterProvider := metric.NewMeterProvider(
+        metric.WithResource(res),
+        metric.WithReader(metric.NewPeriodicReader(metricExporter)),
     )
+    otel.SetMeterProvider(meterProvider)
 
-    // TokensGenerated counts output tokens.
-    TokensGenerated = prometheus.NewCounterVec(
-        prometheus.CounterOpts{
-            Name: "inference_tokens_generated_total",
-            Help: "Total tokens generated",
-        },
-        []string{"model"},
+    // Traces: OTLP exporter (works with Jaeger, Tempo, etc.)
+    traceExporter, err := otlptracegrpc.New(ctx)
+    if err != nil {
+        return nil, err
+    }
+    tracerProvider := trace.NewTracerProvider(
+        trace.WithResource(res),
+        trace.WithBatcher(traceExporter),
     )
+    otel.SetTracerProvider(tracerProvider)
 
-    // BackendHealthy indicates backend status (1=up, 0=down).
-    BackendHealthy = prometheus.NewGauge(
-        prometheus.GaugeOpts{
-            Name: "inference_backend_healthy",
-            Help: "Backend health status",
-        },
+    // Cleanup function for graceful shutdown
+    return func() {
+        meterProvider.Shutdown(ctx)
+        tracerProvider.Shutdown(ctx)
+    }, nil
+}
+\end{lstlisting}
+\end{programcode}
+
+\subsection{Metrics}
+\label{subsec:metrics-ref}
+
+\begin{programcode}{Core Metrics with OpenTelemetry}
+\begin{lstlisting}[language=Go]
+// Metrics holds OpenTelemetry metric instruments.
+type Metrics struct {
+    RequestsTotal   metric.Int64Counter
+    RequestDuration metric.Float64Histogram
+    TokensGenerated metric.Int64Counter
+    BackendHealthy  metric.Int64UpDownCounter
+}
+
+// NewMetrics creates metric instruments from the global meter provider.
+func NewMetrics() (*Metrics, error) {
+    meter := otel.Meter("inference-control-plane")
+
+    requestsTotal, err := meter.Int64Counter(
+        "inference.requests.total",
+        metric.WithDescription("Total inference requests"),
+        metric.WithUnit("{request}"),
     )
-)
+    if err != nil {
+        return nil, err
+    }
+
+    requestDuration, err := meter.Float64Histogram(
+        "inference.request.duration",
+        metric.WithDescription("Request duration in seconds"),
+        metric.WithUnit("s"),
+        metric.WithExplicitBucketBoundaries(0.1, 0.5, 1, 2, 5, 10, 30, 60),
+    )
+    if err != nil {
+        return nil, err
+    }
+
+    tokensGenerated, err := meter.Int64Counter(
+        "inference.tokens.generated",
+        metric.WithDescription("Total tokens generated"),
+        metric.WithUnit("{token}"),
+    )
+    if err != nil {
+        return nil, err
+    }
+
+    backendHealthy, err := meter.Int64UpDownCounter(
+        "inference.backend.healthy",
+        metric.WithDescription("Backend health (1=healthy, 0=unhealthy)"),
+    )
+    if err != nil {
+        return nil, err
+    }
+
+    return &Metrics{
+        RequestsTotal:   requestsTotal,
+        RequestDuration: requestDuration,
+        TokensGenerated: tokensGenerated,
+        BackendHealthy:  backendHealthy,
+    }, nil
+}
+\end{lstlisting}
+\end{programcode}
+
+\subsection{Distributed Tracing}
+\label{subsec:tracing-ref}
+
+\begin{programcode}{Request Tracing}
+\begin{lstlisting}[language=Go]
+// TraceMiddleware adds distributed tracing to requests.
+func TraceMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        tracer := otel.Tracer("inference-control-plane")
+        ctx, span := tracer.Start(r.Context(), r.URL.Path,
+            trace.WithAttributes(
+                attribute.String("http.method", r.Method),
+                attribute.String("http.url", r.URL.String()),
+            ),
+        )
+        defer span.End()
+
+        // Pass trace context to backend calls
+        next.ServeHTTP(w, r.WithContext(ctx))
+    })
+}
+
+// PropagateTrace injects trace context into outgoing HTTP requests.
+func PropagateTrace(ctx context.Context, req *http.Request) {
+    otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
+}
 \end{lstlisting}
 \end{programcode}
 
