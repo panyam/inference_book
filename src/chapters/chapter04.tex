@@ -1,6 +1,6 @@
-%%%%%%%%%%%%%%%%%%%%% chapter03.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%% chapter04.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% Chapter 3: Model Formats and Quantization
+% Chapter 4: Model Formats and Quantization
 %
 %%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -16,7 +16,9 @@
 \label{sec:model-formats}
 % =============================================================================
 
-% TODO: Overview of formats and their purposes
+Chapter~\ref{ch:hardware-fundamentals} showed us how to calculate VRAM requirements: a 7B model at FP16 needs 14 GB, but quantized to INT4 needs only 3.5 GB. But where do these quantized models come from? How do you choose between the dozens of variants on Hugging Face? This chapter answers these questions.
+
+The path from a trained model to inference involves several decisions: which format to use (SafeTensors, GGUF, ONNX), which quantization method (GPTQ, AWQ, GGUF's built-in quantization), and which specific quantization level (Q4, Q5, Q8). Each choice affects memory usage, inference speed, and output quality. By the end of this chapter, you'll know how to navigate these options and select the right model for your hardware and use case.
 
 \subsection{SafeTensors}
 \label{subsec:safetensors}
@@ -261,8 +263,14 @@ type ModelRegistry interface {
 
 % =============================================================================
 \section{Summary}
-\label{sec:ch03-summary}
+\label{sec:ch04-summary}
 % =============================================================================
+
+This chapter covered the practical decisions involved in selecting and preparing models for inference. Model formats determine compatibility with inference engines---GGUF for llama.cpp's flexibility, SafeTensors for the Hugging Face ecosystem, and ONNX for cross-platform deployment. Quantization methods trade quality for memory, with Q4 providing an excellent balance for most use cases.
+
+The model registry concept introduced here becomes part of your control plane, tracking which models are available, their resource requirements, and their capabilities. This metadata drives routing decisions when you support multiple models.
+
+With models selected and ready, Chapter~\ref{ch:inference-engines} introduces the software that actually runs them: inference engines like Ollama, llama.cpp, and vLLM. Each engine has different strengths---simplicity, flexibility, or production performance---and choosing the right one depends on your deployment scenario.
 
 \begin{important}{Key Takeaways}
 \begin{itemize}
@@ -297,4 +305,4 @@ You're building a customer support chatbot that needs to handle billing question
 Implement the \texttt{ModelRegistry} interface using a JSON file as the backing store. Include methods for adding models, listing by capability, and finding the best model for a given VRAM constraint.
 \end{prob}
 
-\input{chapters/references03}
+\input{chapters/references04}

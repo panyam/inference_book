@@ -1,6 +1,6 @@
-%%%%%%%%%%%%%%%%%%%%% chapter04.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%% chapter05.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% Chapter 4: Inference Engines
+% Chapter 5: Inference Engines
 %
 %%%%%%%%%%%%%%%%%%%%%%%% Springer-Verlag %%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -16,12 +16,16 @@
 \label{sec:inference-engine-role}
 % =============================================================================
 
-% TODO: What inference engines do
-% - Load models into memory
-% - Process requests
-% - Manage batching
-% - Handle streaming
-% - Optimize throughput
+You've selected your hardware (Chapter~\ref{ch:hardware-fundamentals}) and chosen your models (Chapter~\ref{ch:models}). Now you need software to actually run inference. An \emph{inference engine} loads model weights into memory, processes requests, manages batching, handles streaming, and optimizes throughput. Choosing the right engine is as important as choosing the right model.
+
+This chapter covers three engines that represent different points on the simplicity-performance spectrum:
+\begin{description}
+\item[Ollama] The Docker of LLMs---simple installation, model management, and a clean API. Great for development and personal use.
+\item[llama.cpp] Maximum flexibility---runs on any hardware (CPU, GPU, Apple Silicon), supports all quantization formats, highly configurable.
+\item[vLLM] Production performance---continuous batching, PagedAttention, and optimizations that maximize throughput for serving many users.
+\end{description}
+
+By the end of this chapter, you'll understand when to use each engine and how to integrate them with your control plane.
 
 % =============================================================================
 \section{Ollama: Simplicity First}
