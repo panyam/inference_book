@@ -42,48 +42,7 @@ This sequential dependency creates two critical problems:
 
 Researchers tried various fixes: bidirectional RNNs, attention mechanisms bolted onto RNNs, skip connections. These helped, but the fundamental sequential bottleneck remained.
 
-% Diagram: RNN Sequential Processing
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[
-    node distance=1.5cm,
-    token/.style={rectangle, draw, minimum width=1cm, minimum height=0.8cm, fill=blue!10},
-    hidden/.style={circle, draw, minimum size=0.8cm, fill=orange!20},
-    arrow/.style={->, thick}
-]
-% Tokens
-\node[token] (t1) {The};
-\node[token, right of=t1] (t2) {cat};
-\node[token, right of=t2] (t3) {sat};
-\node[token, right of=t3] (t4) {on};
-\node[token, right of=t4] (t5) {the};
-
-% Hidden states
-\node[hidden, below of=t1] (h1) {$h_1$};
-\node[hidden, below of=t2] (h2) {$h_2$};
-\node[hidden, below of=t3] (h3) {$h_3$};
-\node[hidden, below of=t4] (h4) {$h_4$};
-\node[hidden, below of=t5] (h5) {$h_5$};
-
-% Vertical arrows (token to hidden)
-\draw[arrow] (t1) -- (h1);
-\draw[arrow] (t2) -- (h2);
-\draw[arrow] (t3) -- (h3);
-\draw[arrow] (t4) -- (h4);
-\draw[arrow] (t5) -- (h5);
-
-% Horizontal arrows (sequential dependency)
-\draw[arrow, red, thick] (h1) -- (h2);
-\draw[arrow, red, thick] (h2) -- (h3);
-\draw[arrow, red, thick] (h3) -- (h4);
-\draw[arrow, red, thick] (h4) -- (h5);
-
-% Labels
-\node[below of=h3, yshift=-0.3cm] {\small Sequential dependency: each step waits for previous};
-\end{tikzpicture}
-\caption{RNN processing: each hidden state depends on the previous, forcing sequential execution.}
-\label{fig:rnn-sequential}
-\end{figure}
+\input{chapters/chapter02/diagram01}
 
 \subsection{Attention Changes Everything}
 \label{subsec:attention-changes}
@@ -106,47 +65,7 @@ This architectural change has profound implications:
 \item[Scalability] The architecture scales with compute. More GPUs means faster training. Larger models with more parameters consistently perform better. This predictable scaling enabled the race to larger models we see today.
 \end{description}
 
-% Diagram: Transformer Parallel Processing
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[
-    node distance=1.5cm,
-    token/.style={rectangle, draw, minimum width=1cm, minimum height=0.8cm, fill=blue!10},
-    output/.style={rectangle, draw, minimum width=1cm, minimum height=0.8cm, fill=green!10},
-    arrow/.style={->, thick}
-]
-% Input tokens
-\node[token] (t1) {The};
-\node[token, right of=t1] (t2) {cat};
-\node[token, right of=t2] (t3) {sat};
-\node[token, right of=t3] (t4) {on};
-\node[token, right of=t4] (t5) {the};
-
-% Output representations
-\node[output, below of=t1, yshift=-1cm] (o1) {$y_1$};
-\node[output, below of=t2, yshift=-1cm] (o2) {$y_2$};
-\node[output, below of=t3, yshift=-1cm] (o3) {$y_3$};
-\node[output, below of=t4, yshift=-1cm] (o4) {$y_4$};
-\node[output, below of=t5, yshift=-1cm] (o5) {$y_5$};
-
-% Attention connections (showing each output attends to all inputs)
-\foreach \i in {1,2,3,4,5} {
-    \foreach \j in {1,2,3,4,5} {
-        \draw[gray!40, thin] (t\j.south) -- (o\i.north);
-    }
-}
-
-% Highlight one token's attention pattern
-\draw[blue, thick, ->] (t1.south) -- (o3.north);
-\draw[blue, thick, ->] (t2.south) -- (o3.north);
-\draw[blue, thick, ->] (t3.south) -- (o3.north);
-
-% Labels
-\node[below of=o3, yshift=-0.3cm] {\small All tokens processed in parallel; each attends to all others};
-\end{tikzpicture}
-\caption{Transformer processing: all tokens processed simultaneously with direct attention connections.}
-\label{fig:transformer-parallel}
-\end{figure}
+\input{chapters/chapter02/diagram02}
 
 The trade-off is memory. An RNN's memory usage is roughly constant regardless of sequence length---it just maintains a fixed-size hidden state. A transformer's memory grows with sequence length because it must track relationships between all token pairs. For a sequence of $n$ tokens, there are $n^2$ potential attention connections. This quadratic scaling is why context length limits exist and why the KV cache optimization (Section~\ref{sec:kv-cache}) is so important.
 
@@ -199,41 +118,7 @@ Consider translating ``The cat sat'' to French. This is a \emph{sequence-to-sequ
 
 The encoder reads the full input and builds a rich representation---a ``summary'' of what needs to be translated. The decoder then generates the output word-by-word, consulting that summary. The encoder can look at all words simultaneously (bidirectional attention), while the decoder generates left-to-right.
 
-% Diagram: Encoder-Decoder Architecture
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[
-    node distance=0.8cm,
-    block/.style={rectangle, draw, minimum width=2cm, minimum height=0.7cm, font=\small},
-    encoder/.style={block, fill=blue!20},
-    decoder/.style={block, fill=green!20},
-    arrow/.style={->, thick}
-]
-% Encoder side
-\node[encoder] (e1) {Encoder};
-\node[above of=e1, yshift=0.3cm] (in) {\small Input: ``The cat sat''};
-\node[below of=e1, yshift=-0.3cm] (enc-out) {\small Context representation};
-
-% Decoder side
-\node[decoder, right of=e1, xshift=3cm] (d1) {Decoder};
-\node[above of=d1, yshift=0.3cm] (prev) {\small Previous outputs};
-\node[below of=d1, yshift=-0.3cm] (out) {\small ``Le chat s'est assis''};
-
-% Arrows
-\draw[arrow] (in) -- (e1);
-\draw[arrow] (e1) -- (enc-out);
-\draw[arrow, dashed] (enc-out) -- ++(1.5, 0) |- (d1);
-\draw[arrow] (prev) -- (d1);
-\draw[arrow] (d1) -- (out);
-
-% Labels
-\node[below of=enc-out, yshift=-0.8cm, align=center, font=\scriptsize] {Sees all input\\(bidirectional)};
-\node[below of=out, yshift=-0.5cm, align=center, font=\scriptsize] {Generates left-to-right\\(causal)};
-
-\end{tikzpicture}
-\caption{Encoder-decoder architecture: encoder summarizes input, decoder generates output.}
-\label{fig:encoder-decoder}
-\end{figure}
+\input{chapters/chapter02/diagram03}
 
 \paragraph{Why Text Generation Differs}
 
@@ -253,84 +138,7 @@ Modern LLMs like GPT, Llama, Mistral, and Qwen are decoder-only transformers. At
 \item \textbf{Output}: Convert final vectors back to token probabilities
 \end{enumerate}
 
-% Diagram: Decoder-only Architecture with Layer Detail
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[
-    node distance=0.5cm,
-    block/.style={rectangle, draw, minimum width=2.5cm, minimum height=0.5cm, font=\scriptsize},
-    attn/.style={block, fill=blue!20},
-    ffn/.style={block, fill=orange!20},
-    norm/.style={block, fill=gray!10},
-    arrow/.style={->, thick}
-]
-% Left side: Overall architecture
-\node (input) {\small Input tokens};
-\node[block, fill=purple!10, below of=input, yshift=-0.2cm] (emb) {Embedding};
-
-% Simplified layers
-\node[rectangle, draw, dashed, minimum width=2.8cm, minimum height=1.2cm, below of=emb, yshift=-0.5cm] (l1box) {};
-\node at (l1box.center) {\scriptsize Layer 1};
-
-\node[below of=l1box, yshift=-0.1cm] (dots) {...};
-
-\node[rectangle, draw, dashed, minimum width=2.8cm, minimum height=1.2cm, below of=dots, yshift=-0.1cm] (lnbox) {};
-\node at (lnbox.center) {\scriptsize Layer N};
-
-\node[block, fill=green!10, below of=lnbox, yshift=-0.5cm] (out) {Output projection};
-\node[below of=out, yshift=-0.2cm] (probs) {\small Probabilities};
-
-% Left arrows
-\draw[arrow] (input) -- (emb);
-\draw[arrow] (emb) -- (l1box);
-\draw[arrow] (l1box) -- (dots);
-\draw[arrow] (dots) -- (lnbox);
-\draw[arrow] (lnbox) -- (out);
-\draw[arrow] (out) -- (probs);
-
-% Right side: Layer detail (expanded view)
-\node[right of=l1box, xshift=4.5cm, yshift=1.5cm] (layer-input) {\scriptsize Input $x$};
-
-% Attention block
-\node[norm, below of=layer-input, yshift=-0.1cm] (ln1) {LayerNorm};
-\node[attn, below of=ln1, yshift=-0.1cm] (attn) {Multi-Head Attention};
-
-% First residual
-\node[circle, draw, fill=white, minimum size=0.3cm, below of=attn, yshift=-0.1cm] (add1) {\tiny +};
-
-% FFN block
-\node[norm, below of=add1, yshift=-0.1cm] (ln2) {LayerNorm};
-\node[ffn, below of=ln2, yshift=-0.1cm] (ffn) {Feed-Forward};
-
-% Second residual
-\node[circle, draw, fill=white, minimum size=0.3cm, below of=ffn, yshift=-0.1cm] (add2) {\tiny +};
-
-\node[below of=add2, yshift=-0.1cm] (layer-output) {\scriptsize Output};
-
-% Detail arrows
-\draw[arrow] (layer-input) -- (ln1);
-\draw[arrow] (ln1) -- (attn);
-\draw[arrow] (attn) -- (add1);
-\draw[arrow] (add1) -- (ln2);
-\draw[arrow] (ln2) -- (ffn);
-\draw[arrow] (ffn) -- (add2);
-\draw[arrow] (add2) -- (layer-output);
-
-% Residual connections
-\draw[arrow, gray, dashed] (layer-input.east) -- ++(0.8,0) |- (add1.east);
-\draw[arrow, gray, dashed] (add1.west) -- ++(-0.5,0) |- (add2.west);
-
-% Annotations
-\node[right of=attn, xshift=1.2cm, font=\tiny, align=left] {Tokens\\communicate};
-\node[right of=ffn, xshift=1.2cm, font=\tiny, align=left] {Independent\\processing};
-
-% Connection between left and right
-\draw[dashed, gray] (l1box.east) -- ++(0.5, 0) -- ++(0, 1) -- (layer-input.west);
-
-\end{tikzpicture}
-\caption{Decoder-only transformer: N layers of attention + FFN with residual connections.}
-\label{fig:decoder-only}
-\end{figure}
+\input{chapters/chapter02/diagram04}
 
 Each transformer layer has the same structure, repeated many times. A 7B model might have 32 layers; a 70B model might have 80. More layers generally means more sophisticated reasoning capabilities.
 
@@ -389,113 +197,14 @@ M = \begin{pmatrix}
 
 The $-\infty$ values become 0 after softmax (since $e^{-\infty} = 0$), effectively zeroing out attention to future positions. Token 1 can only attend to itself; token 2 can attend to tokens 1--2; token $n$ can attend to tokens 1--$n$.
 
-% Diagram: Causal Mask
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[scale=0.6]
-% Grid
-\draw[step=1cm, gray, very thin] (0,0) grid (5,5);
-
-% Colored cells (lower triangle = can attend)
-\foreach \x in {0,...,4} {
-    \foreach \y in {0,...,4} {
-        \pgfmathtruncatemacro{\sum}{\x + \y}
-        \ifnum \y < 5
-            \ifnum \x > \y
-                \fill[green!30] (\x, 4-\y) rectangle (\x+1, 5-\y);
-            \else
-                \fill[red!20] (\x, 4-\y) rectangle (\x+1, 5-\y);
-            \fi
-        \fi
-    }
-}
-
-% Fix the diagonal and below
-\fill[green!30] (0,4) rectangle (1,5);
-\fill[green!30] (0,3) rectangle (1,4);
-\fill[green!30] (1,3) rectangle (2,4);
-\fill[green!30] (0,2) rectangle (1,3);
-\fill[green!30] (1,2) rectangle (2,3);
-\fill[green!30] (2,2) rectangle (3,3);
-\fill[green!30] (0,1) rectangle (1,2);
-\fill[green!30] (1,1) rectangle (2,2);
-\fill[green!30] (2,1) rectangle (3,2);
-\fill[green!30] (3,1) rectangle (4,2);
-\fill[green!30] (0,0) rectangle (1,1);
-\fill[green!30] (1,0) rectangle (2,1);
-\fill[green!30] (2,0) rectangle (3,1);
-\fill[green!30] (3,0) rectangle (4,1);
-\fill[green!30] (4,0) rectangle (5,1);
-
-% Labels
-\node at (2.5, 5.5) {\small Key position (attending to)};
-\node[rotate=90] at (-0.7, 2.5) {\small Query position};
-
-% Token labels
-\foreach \i in {1,...,5} {
-    \node at (\i-0.5, -0.3) {\tiny $t_{\i}$};
-    \node at (-0.3, 5.5-\i) {\tiny $t_{\i}$};
-}
-
-% Legend
-\node[right] at (6, 3.5) {\small \colorbox{green!30}{Can attend}};
-\node[right] at (6, 2.5) {\small \colorbox{red!20}{Masked ($-\infty$)}};
-
-\end{tikzpicture}
-\caption{Causal attention mask: each token (row) can only attend to itself and earlier tokens (columns).}
-\label{fig:causal-mask}
-\end{figure}
+\input{chapters/chapter02/diagram05}
 
 \subsection{Multi-Head Attention}
 \label{subsec:multi-head-attention}
 
 A single attention mechanism learns one way to relate tokens. But language has many types of relationships: grammatical dependencies, semantic similarity, coreference, and more. Multi-head attention runs multiple attention mechanisms in parallel, each learning different relationships.
 
-% Diagram: Multi-Head Attention
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[
-    scale=0.85,
-    head/.style={rectangle, draw, minimum width=1.2cm, minimum height=0.8cm, font=\scriptsize},
-    arrow/.style={->, thick}
-]
-% Input
-\node (input) at (0, 3) {\small Input (dim $d$)};
-
-% Split into heads
-\node[head, fill=red!20] at (-3, 1.5) (h1) {Head 1};
-\node[head, fill=blue!20] at (-1, 1.5) (h2) {Head 2};
-\node[head, fill=green!20] at (1, 1.5) (h3) {Head 3};
-\node at (2.5, 1.5) {...};
-\node[head, fill=orange!20] at (4, 1.5) (hn) {Head $H$};
-
-% Arrows from input
-\draw[arrow] (input) -- (-3, 2.3) -- (h1);
-\draw[arrow] (input) -- (-1, 2.3) -- (h2);
-\draw[arrow] (input) -- (1, 2.3) -- (h3);
-\draw[arrow] (input) -- (4, 2.3) -- (hn);
-
-% Concatenate
-\node[rectangle, draw, minimum width=4cm, minimum height=0.6cm, fill=gray!10] at (0.5, 0) (concat) {Concatenate + Project};
-
-% Arrows to concat
-\draw[arrow] (h1) -- (-3, 0.6) -- (-1.5, 0.4);
-\draw[arrow] (h2) -- (-1, 0.6) -- (-0.5, 0.4);
-\draw[arrow] (h3) -- (1, 0.6) -- (0.5, 0.4);
-\draw[arrow] (hn) -- (4, 0.6) -- (2.5, 0.4);
-
-% Output
-\node at (0.5, -1) (output) {\small Output (dim $d$)};
-\draw[arrow] (concat) -- (output);
-
-% Annotations
-\node[below of=h1, yshift=0.2cm, font=\tiny, align=center] {dim $d/H$};
-\node[below of=hn, yshift=0.2cm, font=\tiny, align=center] {dim $d/H$};
-
-\end{tikzpicture}
-\caption{Multi-head attention: input is split across $H$ heads, each processing $d/H$ dimensions independently.}
-\label{fig:multi-head-attention}
-\end{figure}
+\input{chapters/chapter02/diagram06}
 
 \paragraph{Why Multiple Heads?}
 
@@ -549,44 +258,7 @@ Note: $\text{Heads} \times \text{Head Dim} = \text{Model Dim}$. The heads divide
 
 After attention lets tokens gather information from each other, each token passes through a feed-forward network (FFN). Unlike attention, the FFN processes each token independently---no communication between positions.
 
-% Diagram: FFN Structure
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[
-    node distance=0.7cm,
-    block/.style={rectangle, draw, minimum width=2cm, minimum height=0.6cm, font=\small},
-    arrow/.style={->, thick}
-]
-% Input
-\node (input) {\small Input: $x$ (dim $d$)};
-
-% Expand
-\node[block, fill=blue!20, below of=input, yshift=-0.2cm] (up) {Up-project $W_1$};
-\node[right of=up, xshift=1.8cm, font=\scriptsize] {$d \rightarrow 4d$};
-
-% Activation
-\node[block, fill=yellow!20, below of=up] (act) {Activation (SwiGLU)};
-
-% Contract
-\node[block, fill=green!20, below of=act] (down) {Down-project $W_2$};
-\node[right of=down, xshift=1.8cm, font=\scriptsize] {$4d \rightarrow d$};
-
-% Output
-\node[below of=down, yshift=-0.2cm] (output) {\small Output: $y$ (dim $d$)};
-
-% Arrows
-\draw[arrow] (input) -- (up);
-\draw[arrow] (up) -- (act);
-\draw[arrow] (act) -- (down);
-\draw[arrow] (down) -- (output);
-
-% Annotation
-\node[right of=act, xshift=2.5cm, align=left, font=\scriptsize] {Expansion creates\\space to store\\factual knowledge};
-
-\end{tikzpicture}
-\caption{Feed-forward network: expand, activate, contract. Most parameters live here.}
-\label{fig:ffn-structure}
-\end{figure}
+\input{chapters/chapter02/diagram07}
 
 \paragraph{Why Expand and Contract?}
 
@@ -621,6 +293,8 @@ FFNs are also where most parameters live:
 \begin{equation}
 \text{FFN parameters per layer} = 2 \times d \times 4d = 8d^2 \quad \text{(or } 12d^2 \text{ for SwiGLU)}
 \end{equation}
+
+\calclink{/c/2/ffn}{hidden=4096&expansion=4&ffn_type=standard&layers=32}{Try the interactive FFN Parameters calculator}
 
 For a model with $d = 4096$:
 \begin{itemize}
@@ -680,6 +354,8 @@ For a typical 7B model with 32 layers:
 \item Total: $\sim$7B parameters
 \end{itemize}
 \end{svgraybox}
+
+\calclink{/c/2/params}{layers=32&hidden=4096&heads=32&vocab=32000&ffn_mult=2.67&ffn_type=swiglu}{Try the interactive Model Parameter calculator}
 
 % =============================================================================
 \section{The Inference Lifecycle}
@@ -782,40 +458,7 @@ The term ``autoregressive'' means each output depends on previous outputs. The m
 
 This sequential dependency is fundamental---you can't predict token 10 without knowing tokens 1--9. It's also why the KV cache is so important: without it, generating token 100 would require reprocessing tokens 1--99, making generation impossibly slow.
 
-% Diagram: Inference Lifecycle
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[
-    node distance=0.8cm,
-    phase/.style={rectangle, draw, rounded corners, minimum width=2.5cm, minimum height=1cm, font=\small},
-    prefill/.style={phase, fill=blue!20},
-    decode/.style={phase, fill=green!20},
-    arrow/.style={->, thick}
-]
-% Prefill
-\node[prefill] (pf) {Prefill};
-\node[below of=pf, yshift=-0.2cm, font=\scriptsize, align=center] (pf-desc) {Process all prompt tokens\\Build KV cache};
-
-% Decode steps
-\node[decode, right of=pf, xshift=2.5cm] (d1) {Decode $t_1$};
-\node[decode, right of=d1, xshift=1.5cm] (d2) {Decode $t_2$};
-\node[right of=d2, xshift=0.8cm] (dots) {...};
-\node[decode, right of=dots, xshift=0.8cm] (dn) {Decode $t_n$};
-
-% Arrows
-\draw[arrow] (pf) -- (d1);
-\draw[arrow] (d1) -- (d2);
-\draw[arrow] (d2) -- (dots);
-\draw[arrow] (dots) -- (dn);
-
-% Labels
-\node[above of=pf, yshift=0.3cm, font=\small] {TTFT};
-\node[above of=d2, yshift=0.3cm, font=\small] {ITL per token};
-
-\end{tikzpicture}
-\caption{Inference lifecycle: prefill determines TTFT, decode determines generation speed.}
-\label{fig:inference-lifecycle}
-\end{figure}
+\input{chapters/chapter02/diagram08}
 
 \subsection{Stopping Conditions}
 \label{subsec:stopping-conditions}
@@ -959,53 +602,7 @@ This trade-off also explains why the two phases of inference have different char
 
 For systems engineers, this means different bottlenecks at different times. A prompt with 4,000 tokens followed by a 100-token response spends most of its latency in prefill. A short prompt with a long response spends most time in decode. Optimization strategies differ accordingly.
 
-% Diagram: KV Cache Growth
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[
-    scale=0.9,
-    cache/.style={rectangle, draw, fill=orange!30, minimum width=0.4cm},
-    newtoken/.style={rectangle, draw, fill=blue!30, minimum width=0.4cm, minimum height=0.6cm}
-]
-% Step 1
-\node at (-1, 2) {\small Step 1:};
-\node[newtoken] at (0, 2) {$t_1$};
-\node[cache, minimum height=0.6cm] at (1.5, 2) {$K_1V_1$};
-
-% Step 2
-\node at (-1, 1) {\small Step 2:};
-\node[newtoken] at (0, 1) {$t_2$};
-\node[cache, minimum height=0.6cm] at (1.5, 1) {$K_1V_1$};
-\node[cache, minimum height=0.6cm] at (2.1, 1) {$K_2V_2$};
-
-% Step 3
-\node at (-1, 0) {\small Step 3:};
-\node[newtoken] at (0, 0) {$t_3$};
-\node[cache, minimum height=0.6cm] at (1.5, 0) {$K_1V_1$};
-\node[cache, minimum height=0.6cm] at (2.1, 0) {$K_2V_2$};
-\node[cache, minimum height=0.6cm] at (2.7, 0) {$K_3V_3$};
-
-% Step n
-\node at (-1, -1.2) {\small Step n:};
-\node[newtoken] at (0, -1.2) {$t_n$};
-\node[cache, minimum height=0.6cm] at (1.5, -1.2) {$K_1V_1$};
-\node at (2.3, -1.2) {...};
-\node[cache, minimum height=0.6cm] at (3.1, -1.2) {$K_nV_n$};
-
-% Labels
-\node at (0, -2.2) {\small New token};
-\node at (2.3, -2.2) {\small KV Cache (grows with sequence)};
-
-% Arrows showing cache read
-\draw[->, gray, dashed] (0.3, 2) -- (1.2, 2);
-\draw[->, gray, dashed] (0.3, 1) -- (1.2, 1);
-\draw[->, gray, dashed] (0.3, 0) -- (1.2, 0);
-\draw[->, gray, dashed] (0.3, -1.2) -- (1.2, -1.2);
-
-\end{tikzpicture}
-\caption{KV cache grows linearly: each new token adds its K/V to the cache and reads all previous entries.}
-\label{fig:kv-cache-growth}
-\end{figure}
+\input{chapters/chapter02/diagram09}
 
 % =============================================================================
 \section{Key Metrics for Inference}
@@ -1069,49 +666,7 @@ The key insight: throughput and latency trade off. Batching multiple requests to
 
 Production systems use \emph{continuous batching}---dynamically adding new requests to an in-progress batch. This achieves high throughput while keeping latency bounded. Chapter~\ref{ch:inference-engines} covers vLLM's implementation in detail.
 
-% Diagram: Metrics Visualization
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[scale=0.85]
-% Timeline
-\draw[thick, ->] (0, 0) -- (12, 0) node[right] {Time};
-
-% Request marker
-\draw[thick] (0, -0.2) -- (0, 0.2);
-\node[above] at (0, 0.2) {\small Request};
-
-% TTFT bracket
-\draw[thick] (0, 0.8) -- (0, 1.2) -- (2.5, 1.2) -- (2.5, 0.8);
-\node[above] at (1.25, 1.2) {\small TTFT};
-
-% First token
-\draw[thick, blue] (2.5, -0.2) -- (2.5, 0.2);
-\node[below, blue] at (2.5, -0.3) {\small $t_1$};
-
-% ITL brackets
-\draw[thick] (2.5, -0.8) -- (2.5, -1.2) -- (3.5, -1.2) -- (3.5, -0.8);
-\node[below] at (3, -1.2) {\scriptsize ITL};
-
-% Subsequent tokens
-\foreach \x/\n in {3.5/2, 4.5/3, 5.5/4, 6.5/5, 7.5/6} {
-    \draw[thick, blue] (\x, -0.2) -- (\x, 0.2);
-    \node[below, blue] at (\x, -0.3) {\small $t_{\n}$};
-}
-
-\node at (8.5, 0) {...};
-
-% Final token
-\draw[thick, blue] (9.5, -0.2) -- (9.5, 0.2);
-\node[below, blue] at (9.5, -0.3) {\small $t_n$};
-
-% Total time bracket
-\draw[thick] (0, -2) -- (0, -2.4) -- (9.5, -2.4) -- (9.5, -2);
-\node[below] at (4.75, -2.4) {\small Total latency};
-
-\end{tikzpicture}
-\caption{Inference timing: TTFT is time to first token, ITL is time between subsequent tokens.}
-\label{fig:inference-timing}
-\end{figure}
+\input{chapters/chapter02/diagram10}
 
 \begin{table}[htbp]
 \centering
@@ -1165,46 +720,7 @@ While decoder-only transformers dominate LLM inference, several other architectu
 
 MoE models replace the single feed-forward network with multiple ``expert'' FFNs. A learned router decides which experts process each token. Not all parameters are active for every token.
 
-% Diagram: MoE Architecture
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[
-    node distance=0.6cm,
-    block/.style={rectangle, draw, minimum width=1.5cm, minimum height=0.5cm, font=\scriptsize},
-    expert/.style={block, fill=orange!20},
-    router/.style={block, fill=blue!20},
-    arrow/.style={->, thick}
-]
-% Input
-\node (input) {\small Token};
-
-% Router
-\node[router, below of=input, yshift=-0.3cm] (router) {Router};
-
-% Experts
-\node[expert, below of=router, xshift=-2cm, yshift=-0.5cm] (e1) {Expert 1};
-\node[expert, below of=router, xshift=-0.7cm, yshift=-0.5cm] (e2) {Expert 2};
-\node[below of=router, xshift=0.5cm, yshift=-0.5cm] (dots) {...};
-\node[expert, below of=router, xshift=1.7cm, yshift=-0.5cm] (en) {Expert N};
-
-% Output
-\node[below of=dots, yshift=-0.5cm] (output) {\small Output};
-
-% Arrows
-\draw[arrow] (input) -- (router);
-\draw[arrow, blue, thick] (router) -- (e1) node[midway, left, font=\tiny] {0.7};
-\draw[arrow, gray, dashed] (router) -- (e2);
-\draw[arrow, blue, thick] (router) -- (en) node[midway, right, font=\tiny] {0.3};
-\draw[arrow] (e1) -- (output);
-\draw[arrow] (en) -- (output);
-
-% Annotation
-\node[right of=en, xshift=1.5cm, align=left, font=\scriptsize] {Only 2 experts\\active per token};
-
-\end{tikzpicture}
-\caption{MoE: router selects which experts process each token. Most experts stay idle.}
-\label{fig:moe-architecture}
-\end{figure}
+\input{chapters/chapter02/diagram11}
 
 \begin{backgroundinformation}{MoE Example: Mixtral 8x7B}
 Mixtral 8x7B has 8 experts, each roughly 7B parameters. But only 2 experts are active per token. Total parameters: $\sim$47B. Active parameters: $\sim$13B.
@@ -1325,4 +841,4 @@ Explain why a model might have excellent TTFT but poor ITL, or vice versa. What 
 Mixtral 8x7B has 8 experts with 7B parameters each, but only 2 experts are active per token. Explain why you still need memory for all 47B parameters, not just 14B.
 \end{prob}
 
-\input{chapters/references02}
+\input{chapters/chapter02/references}
