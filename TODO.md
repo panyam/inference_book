@@ -402,8 +402,8 @@ Chapter 3 (Hardware) discusses VRAM, KV cache, and attention heads. This chapter
 
 ### Chapter 5: Inference Engines (was Chapter 4)
 
-**Status:** 🟡 Outline Created
-**File:** `src/chapters/chapter05.tex` (rename from chapter04.tex)
+**Status:** 🟢 First Draft Complete
+**File:** `src/chapters/chapter05/index.tex`
 
 **Learning Objectives:**
 - Understand different inference engines
@@ -412,12 +412,13 @@ Chapter 3 (Hardware) discusses VRAM, KV cache, and attention heads. This chapter
 - Understand performance characteristics
 
 **Topics:**
-- **llama.cpp:** CPU/GPU hybrid, GGUF format, easy to use
+- **Principles:** Core responsibilities, batching, memory management, scheduling, hardware optimization
 - **Ollama:** Simplified deployment, good for getting started
-- **vLLM:** Production-grade, high throughput, continuous batching
-- **ONNX Runtime:** Cross-platform, good for edge
-- **TensorRT:** NVIDIA-optimized, maximum performance
-- Engine comparison matrix
+- **llama.cpp:** CPU/GPU hybrid, GGUF format, maximum flexibility
+- **vLLM:** Production-grade, PagedAttention, continuous batching
+- **SGLang:** Structured generation, RadixAttention
+- **TensorRT-LLM:** NVIDIA-optimized, maximum performance
+- Engine comparison matrix and decision framework
 
 **Model Size Context:**
 - 7B performance across engines
@@ -427,7 +428,7 @@ Chapter 3 (Hardware) discusses VRAM, KV cache, and attention heads. This chapter
 **Persona Callouts:**
 - Backend Engineer: vLLM for production
 - Full-Stack Developer: Ollama for simplicity
-- Edge Engineer: ONNX Runtime
+- Edge Engineer: llama.cpp
 - Infrastructure Engineer: Performance tuning
 
 **Hands-On:**
@@ -441,49 +442,46 @@ Chapter 3 (Hardware) discusses VRAM, KV cache, and attention heads. This chapter
 #### Task Breakdown
 
 **5.1 Section: The Role of Inference Engines**
-- [ ] Write overview (load models, process requests, batching, streaming)
+- [x] Write overview (load models, process requests, batching, streaming)
 
-**5.2 Section: Ollama**
-- [ ] Write Architecture subsection (llama.cpp based, modelfile)
-- [ ] Write Installation and Configuration
-- [ ] Write API Reference (expand existing code)
-- [ ] Write When to Use Ollama
+**5.2 Section: Principles of Inference Engines**
+- [x] Write Core Responsibilities subsection
+- [x] Write The Batching Challenge (static vs continuous)
+- [x] Write Memory Management (PagedAttention)
+- [x] Write Scheduling and Fairness
+- [x] Write Hardware Optimization (FlashAttention, speculative decoding)
+- [x] Write API Design
+- [x] Create inference pipeline diagram (diagram01.tex)
 
-**5.3 Section: llama.cpp**
-- [ ] Write Architecture subsection (C/C++, multi-backend)
-- [ ] Write Building and Installation (CPU, CUDA, Metal)
-- [ ] Write Server Mode (add prose to existing code)
-- [ ] Write Advanced Configuration (layer offload, threads)
-- [ ] Write When to Use llama.cpp
+**5.3 Section: Ollama**
+- [x] Write Architecture subsection (llama.cpp based, modelfile)
+- [x] Write Installation and Configuration
+- [x] Write API Reference
+- [x] Write When to Use Ollama
 
-**5.4 Section: vLLM**
-- [ ] Write Paged Attention subsection
-- [ ] Write Continuous Batching subsection
-- [ ] Write Installation and Setup (add prose to existing code)
-- [ ] Write API and OpenAI Compatibility
-- [ ] Write Performance Tuning
-- [ ] Write When to Use vLLM
+**5.4 Section: llama.cpp**
+- [x] Write Architecture subsection (C/C++, multi-backend)
+- [x] Write Building and Installation (CPU, CUDA, Metal)
+- [x] Write Server Mode
+- [x] Write Advanced Configuration (layer offload, threads)
+- [x] Write When to Use llama.cpp
 
-**5.5 Section: Other Engines**
-- [ ] Write TensorRT-LLM brief overview
-- [ ] Write TGI brief overview
-- [ ] Write SGLang brief overview
+**5.5 Section: Production Engines (vLLM, SGLang, TensorRT-LLM)**
+- [x] Write vLLM section (PagedAttention, continuous batching, tuning)
+- [x] Write SGLang section (RadixAttention, constrained decoding)
+- [x] Write TensorRT-LLM section (compilation, performance)
+- [x] Write TGI brief overview
 
 **5.6 Section: Engine Comparison**
-- [ ] Create comprehensive Comparison Matrix table
-- [ ] Write Decision Framework guide
+- [x] Create comprehensive Comparison Matrix table
+- [x] Write Decision Framework guide
 
-**5.7 Section: Hands-On**
-- [ ] Write exercise: Run all three engines
-- [ ] Create benchmark comparison script
+**5.7 Section: Summary**
+- [x] Write chapter summary
+- [x] Review Key Takeaways
 
-**5.8 Section: Summary**
-- [ ] Write chapter summary
-- [ ] Review Key Takeaways
-- [ ] Preview next chapter
-
-**5.9 References**
-- [ ] Add references to references05.tex (rename from references04.tex)
+**5.8 References**
+- [x] Add references to references05.tex (vLLM, FlashAttention, SGLang, etc.)
 
 ---
 

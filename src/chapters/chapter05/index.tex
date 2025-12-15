@@ -28,39 +28,280 @@ This chapter covers three engines that represent different points on the simplic
 By the end of this chapter, you'll understand when to use each engine and how to integrate them with your control plane.
 
 % =============================================================================
+\section{Principles of Inference Engines}
+\label{sec:inference-principles}
+% =============================================================================
+
+Before diving into specific engines, let's understand what an inference engine must do and the key challenges it faces. These principles explain why engines differ and provide a foundation for evaluating them---or building your own.
+
+\subsection{Core Responsibilities}
+\label{subsec:engine-responsibilities}
+
+An inference engine transforms a sequence of tokens into a probability distribution over the next token, repeatedly, until generation completes. But this simple description hides substantial complexity:
+
+\begin{description}
+\item[Model Loading] Read weights from disk into memory (CPU or GPU). Handle different formats (SafeTensors, GGUF, etc.). Manage memory mapping for efficient loading.
+
+\item[Tokenization] Convert text to token IDs using the model's vocabulary. Handle special tokens, chat templates, and encoding edge cases.
+
+\item[Forward Pass Execution] Run the actual transformer computation: embeddings, attention, feed-forward networks, layer norms. Optimize for the target hardware.
+
+\item[KV Cache Management] Allocate, update, and eventually free the key-value cache for each request. This dominates memory for long sequences.
+
+\item[Sampling] Convert logits to probabilities and select the next token. Implement temperature, top-p, top-k, repetition penalties, and other sampling strategies.
+
+\item[Request Handling] Accept requests via API, manage queuing, handle streaming responses, track request state through generation.
+\end{description}
+
+A minimal inference engine could handle one request at a time, running each to completion before starting the next. But production workloads demand more.
+
+\input{chapters/chapter05/diagram01}
+
+\subsection{The Batching Challenge}
+\label{subsec:batching-challenge}
+
+GPUs achieve high throughput through parallelism---processing many operations simultaneously. A single inference request underutilizes this capacity. \emph{Batching} combines multiple requests to better utilize hardware, but LLM inference presents unique challenges.
+
+\paragraph{The Variable-Length Problem}
+
+Unlike image classification where all inputs have the same shape, LLM requests vary in both input and output length. Request A might have 50 input tokens and generate 200 output tokens. Request B might have 2000 input tokens and generate 20. Traditional batching, where all requests in a batch must complete together, wastes resources:
+
+\begin{itemize}
+\item Short-output requests wait for long-output requests to finish
+\item GPU sits idle while waiting for stragglers
+\item Memory is reserved for the longest possible sequence even if unused
+\end{itemize}
+
+\paragraph{Static vs Dynamic Batching}
+
+\emph{Static batching} groups requests at arrival and processes them together until all complete. Simple to implement but inefficient.
+
+\emph{Dynamic batching} (also called \emph{continuous batching}) allows requests to enter and exit the batch independently. When request A completes after 20 tokens, a new request C can immediately take its place, even while request B continues generating. This dramatically improves throughput.
+
+\begin{svgraybox}
+\textbf{Continuous Batching Impact:}
+
+Consider a batch of 8 requests where generation lengths range from 50 to 500 tokens:
+\begin{itemize}
+\item \textbf{Static batching}: All 8 slots occupied for 500 tokens worth of time. Average utilization: $\sim$50\%
+\item \textbf{Continuous batching}: As short requests finish, new ones fill their slots. Utilization approaches 90-95\%
+\end{itemize}
+Production engines like vLLM and SGLang achieve 2-4x higher throughput through continuous batching alone.
+\end{svgraybox}
+
+\subsection{Memory Management}
+\label{subsec:memory-management}
+
+Memory management is the central challenge of high-performance inference. The KV cache grows linearly with sequence length and must be allocated per-request. Poor memory management leads to fragmentation, wasted capacity, and lower throughput.
+
+\paragraph{The Fragmentation Problem}
+
+Consider serving requests with varying context lengths on a GPU with 24 GB VRAM. The model uses 14 GB, leaving 10 GB for KV cache. If you pre-allocate fixed-size KV cache slots (say, 8K tokens each), you can serve only a handful of requests simultaneously. Requests using 500 tokens waste most of their allocation.
+
+\paragraph{Paged Attention}
+
+vLLM introduced \emph{PagedAttention}~\cite{kwon2023vllm}, borrowing virtual memory concepts from operating systems~\cite{yu2022orca}. Instead of contiguous per-request allocations, the KV cache is divided into fixed-size \emph{pages} (typically 16 tokens). Each request's cache is a list of page references, allocated on demand.
+
+Benefits of paged attention:
+\begin{itemize}
+\item \textbf{Near-zero fragmentation}: Pages are small and uniformly sized
+\item \textbf{Memory sharing}: Requests with common prefixes (like system prompts) can share cached pages
+\item \textbf{Dynamic allocation}: Memory grows with actual sequence length, not maximum possible length
+\item \textbf{Higher batch sizes}: More requests fit in memory, increasing throughput
+\end{itemize}
+
+This innovation enabled 2-4x throughput improvements and has been adopted by most production engines.
+
+\subsection{Scheduling and Fairness}
+\label{subsec:scheduling}
+
+With continuous batching and paged attention, the engine must decide: which requests get GPU time? Key considerations:
+
+\begin{description}
+\item[Prefill vs Decode Priority] Prefill (processing the prompt) is compute-bound and can delay decode (generating tokens) for in-flight requests. Some engines separate prefill and decode into different phases or even different GPUs.
+
+\item[Request Prioritization] Should all requests be equal? Production systems often need priority tiers---premium users shouldn't wait behind batch jobs.
+
+\item[Preemption] When memory pressure is high, can the engine pause a request (saving its KV cache to CPU memory) to make room for higher-priority work?
+
+\item[Fairness] Without care, long-running requests can starve. Round-robin or weighted scheduling ensures progress for all requests.
+\end{description}
+
+\subsection{Hardware Optimization}
+\label{subsec:hardware-optimization}
+
+Raw transformer math is straightforward, but efficient execution requires hardware-aware optimization:
+
+\begin{description}
+\item[Kernel Fusion] Combine multiple operations (e.g., attention + softmax + matmul) into single GPU kernels, reducing memory bandwidth pressure.
+
+\item[FlashAttention] Reorder attention computation to minimize memory reads/writes, achieving 2-4x speedup for attention layers~\cite{dao2022flashattention}
+
+\item[Quantization Support] Run lower-precision computations (INT8, INT4) for faster inference with acceptable quality loss.
+
+\item[Tensor Parallelism] Split model layers across multiple GPUs for models that don't fit on one device.
+
+\item[Speculative Decoding] Use a small ``draft'' model to predict multiple tokens, then verify with the large model~\cite{leviathan2023speculative}. Can improve throughput when draft accuracy is high.
+\end{description}
+
+\subsection{API Design}
+\label{subsec:api-design}
+
+How the engine exposes its capabilities matters for integration:
+
+\begin{description}
+\item[OpenAI Compatibility] Most engines now offer OpenAI-compatible endpoints (\texttt{/v1/chat/completions}, \texttt{/v1/completions}). This lets you swap engines without changing client code.
+
+\item[Streaming] Token-by-token streaming via Server-Sent Events (SSE) is essential for interactive applications. The API must support this efficiently.
+
+\item[Structured Output] JSON mode, function calling, and grammar-constrained generation are increasingly important. Engines differ in support.
+
+\item[Observability] Metrics endpoints, request tracing, and logging help debug production issues.
+\end{description}
+
+\begin{important}{Building Your Own Engine}
+If you're considering building a custom inference engine, these principles define your requirements:
+\begin{enumerate}
+\item Start with a working forward pass (llama.cpp is excellent reference code)
+\item Add basic request handling and streaming
+\item Implement KV cache management (start simple, add paging later)
+\item Add batching (static first, then continuous)
+\item Optimize hot paths with fused kernels and FlashAttention
+\item Add scheduling, preemption, and observability
+\end{enumerate}
+Most teams should use existing engines. Custom engines make sense only for specialized hardware, unique workloads, or deep integration requirements.
+\end{important}
+
+With these principles established, let's examine how specific engines implement them---from simple to production-grade.
+
+% =============================================================================
 \section{Ollama: Simplicity First}
 \label{sec:ollama}
 % =============================================================================
 
-% TODO: Ollama deep dive
-
 \subsection{Architecture and Design Philosophy}
 \label{subsec:ollama-architecture}
 
-% TODO: How Ollama works
-% - Built on llama.cpp
-% - Model management abstraction
-% - REST API
-% - Modelfile system
+Ollama wraps llama.cpp in a user-friendly package, adding model management, a clean REST API, and sensible defaults. Think of it as ``Docker for LLMs''---you pull models by name, run them with simple commands, and let Ollama handle the complexity underneath.
+
+The architecture consists of three main components:
+
+\begin{description}
+\item[Ollama Daemon] A background service that manages model loading, unloading, and request handling. It listens on port 11434 by default and exposes a REST API.
+
+\item[Model Registry] Ollama maintains a local registry of downloaded models at \texttt{\textasciitilde/.ollama/models}. Models are identified by name and optional tag (e.g., \texttt{llama3.2:7b}, \texttt{qwen2.5:14b-instruct}).
+
+\item[llama.cpp Backend] Under the hood, Ollama uses llama.cpp for actual inference. This means you get llama.cpp's performance and hardware support (CPU, CUDA, Metal) with a friendlier interface.
+\end{description}
+
+\paragraph{The Modelfile System}
+
+Ollama introduces ``Modelfiles''---configuration files that define how a model should behave. A Modelfile specifies the base model, system prompt, parameters, and other settings:
+
+\begin{lstlisting}[language=bash,caption={Example Modelfile}]
+FROM llama3.2:7b
+
+# Set the system prompt
+SYSTEM """You are a helpful coding assistant. Be concise and provide
+working code examples when asked."""
+
+# Configure parameters
+PARAMETER temperature 0.7
+PARAMETER num_ctx 4096
+PARAMETER stop "<|eot_id|>"
+\end{lstlisting}
+
+This abstraction lets you create custom model configurations without touching the underlying weights. You can build specialized assistants, adjust generation parameters, and share configurations as simple text files.
 
 \subsection{Installation and Configuration}
 \label{subsec:ollama-install}
 
-% TODO: Setup instructions
-% - All platforms
-% - Configuration options
-% - Memory management
-% - GPU assignment
+Ollama offers the simplest installation of any inference engine. On macOS and Windows, download the installer from \texttt{ollama.com}. On Linux, use the install script:
+
+\begin{lstlisting}[language=bash]
+curl -fsSL https://ollama.com/install.sh | sh
+\end{lstlisting}
+
+The installer sets up Ollama as a system service that starts automatically. Verify installation with:
+
+\begin{lstlisting}[language=bash]
+ollama --version
+ollama list        # Shows downloaded models
+\end{lstlisting}
+
+\paragraph{Downloading Models}
+
+Pull models from Ollama's registry using familiar Docker-like syntax:
+
+\begin{lstlisting}[language=bash]
+ollama pull llama3.2:7b            # Specific size
+ollama pull qwen2.5:14b-instruct   # Different model family
+ollama pull codellama:13b-code     # Code-specialized
+\end{lstlisting}
+
+Models download to \texttt{\textasciitilde/.ollama/models} by default. Override this with the \texttt{OLLAMA\_MODELS} environment variable for systems with limited home directory space.
+
+\paragraph{Configuration Environment Variables}
+
+Ollama reads configuration from environment variables. Key settings include:
+
+\begin{lstlisting}[language=bash]
+# Network configuration
+OLLAMA_HOST=0.0.0.0:11434    # Listen on all interfaces
+OLLAMA_ORIGINS=*             # CORS origins (comma-separated)
+
+# Resource management
+OLLAMA_NUM_PARALLEL=4        # Concurrent request slots
+OLLAMA_MAX_LOADED_MODELS=2   # Models kept in memory
+OLLAMA_MAX_QUEUE=512         # Request queue size
+
+# GPU configuration
+CUDA_VISIBLE_DEVICES=0,1     # Select specific GPUs
+OLLAMA_GPU_OVERHEAD=0        # Reserved GPU memory (bytes)
+\end{lstlisting}
+
+For systemd-managed installations on Linux, add these to \texttt{/etc/systemd/system/ollama.service} under the \texttt{[Service]} section:
+
+\begin{lstlisting}[language=bash]
+[Service]
+Environment="OLLAMA_HOST=0.0.0.0:11434"
+Environment="OLLAMA_NUM_PARALLEL=4"
+\end{lstlisting}
+
+Then reload: \texttt{sudo systemctl daemon-reload \&\& sudo systemctl restart ollama}
+
+\paragraph{Memory Management}
+
+Ollama automatically detects available GPU memory and loads models appropriately. For multi-GPU systems, it distributes layers across devices. You can force CPU-only inference by unsetting CUDA devices:
+
+\begin{lstlisting}[language=bash]
+CUDA_VISIBLE_DEVICES="" ollama run llama3.2:7b
+\end{lstlisting}
+
+The \texttt{OLLAMA\_MAX\_LOADED\_MODELS} setting controls how many models stay loaded simultaneously. Lower this on memory-constrained systems. When a new model is requested and memory is full, Ollama unloads the least-recently-used model.
 
 \subsection{API Reference}
 \label{subsec:ollama-api}
 
-% TODO: Key endpoints
-% - /api/generate
-% - /api/chat
-% - /api/embeddings
-% - /api/tags
-% - /api/show
+Ollama exposes a REST API on port 11434. The API uses JSON for both requests and responses, with optional streaming via newline-delimited JSON.
+
+\paragraph{Core Endpoints}
+
+\begin{description}
+\item[\texttt{POST /api/generate}] Raw text generation. Provide a prompt, get a completion. Supports streaming.
+
+\item[\texttt{POST /api/chat}] Chat-style generation with message history. The preferred endpoint for conversational applications.
+
+\item[\texttt{POST /api/embeddings}] Generate vector embeddings for text. Requires an embedding model like \texttt{nomic-embed-text}.
+
+\item[\texttt{GET /api/tags}] List all locally available models.
+
+\item[\texttt{POST /api/show}] Get detailed information about a specific model (parameters, template, license).
+
+\item[\texttt{POST /api/pull}] Download a model from the registry (useful for programmatic model management).
+
+\item[\texttt{DELETE /api/delete}] Remove a model from local storage.
+\end{description}
 
 \begin{programcode}{Ollama API Examples}
 \begin{lstlisting}[language=bash]
@@ -90,11 +331,22 @@ curl http://localhost:11434/api/embeddings -d '{
 \subsection{When to Use Ollama}
 \label{subsec:ollama-when}
 
-% TODO: Use cases
-% - Development and prototyping
-% - Single-user deployments
-% - Low complexity requirements
-% - When model management matters
+Ollama occupies a specific niche: maximum simplicity for development, prototyping, and low-concurrency deployments. Choose Ollama when:
+
+\paragraph{Development and Prototyping}
+You're building an application that needs local LLM access and want to focus on your application logic, not inference infrastructure. Ollama's one-line installation and simple API get you running in minutes. The Modelfile system lets you iterate on prompts and parameters without code changes.
+
+\paragraph{Single-User or Low-Concurrency}
+Personal assistants, local coding tools, or small team deployments where you'll never have more than a few concurrent users. Ollama handles this gracefully without the complexity of production engines.
+
+\paragraph{Model Exploration}
+Quickly trying different models to find the best fit for your use case. Ollama's registry makes it trivial to pull and test models---\texttt{ollama run qwen2.5:32b} and you're experimenting.
+
+\paragraph{macOS Development}
+Ollama has excellent Apple Silicon support, making it the easiest way to run models on Mac laptops. It automatically uses Metal acceleration without configuration.
+
+\paragraph{When NOT to Use Ollama}
+Avoid Ollama for high-throughput production workloads. Without continuous batching, throughput plateaus quickly. If you need to serve dozens or hundreds of concurrent users, you need vLLM or SGLang. Also avoid Ollama if you need fine-grained control over inference parameters---llama.cpp offers more flexibility.
 
 \begin{svgraybox}
 \textbf{Ollama Strengths:}
@@ -119,33 +371,101 @@ curl http://localhost:11434/api/embeddings -d '{
 \label{sec:llama-cpp}
 % =============================================================================
 
-% TODO: llama.cpp deep dive
-
 \subsection{Architecture}
 \label{subsec:llama-cpp-architecture}
 
-% TODO: How llama.cpp works
-% - C/C++ implementation
-% - Multi-backend (CPU, CUDA, Metal, etc.)
-% - GGUF format native
-% - server binary
+llama.cpp~\cite{gerganov2023llamacpp} is a pure C/C++ implementation of LLM inference, designed from the ground up for portability and efficiency. Created by Georgi Gerganov in March 2023, it has become the foundation for many inference tools---including Ollama~\cite{ollama2024}.
+
+\paragraph{Design Philosophy}
+
+llama.cpp prioritizes:
+\begin{itemize}
+\item \textbf{Zero dependencies}: No Python runtime, no CUDA toolkit required for CPU builds
+\item \textbf{Portability}: Runs on anything from Raspberry Pi to datacenter GPUs
+\item \textbf{Quantization}: Native support for many quantization formats (Q4, Q5, Q6, Q8, and variations)
+\item \textbf{Efficiency}: Hand-optimized kernels for each backend
+\end{itemize}
+
+\paragraph{Backend System}
+
+llama.cpp abstracts hardware through its backend system:
+
+\begin{description}
+\item[CPU] Uses BLAS libraries (OpenBLAS, Intel MKL, Apple Accelerate) with SIMD optimizations (AVX, AVX2, AVX-512, ARM NEON)
+\item[CUDA] NVIDIA GPU acceleration with custom CUDA kernels
+\item[Metal] Apple Silicon GPU acceleration via Metal Performance Shaders
+\item[Vulkan] Cross-platform GPU support (AMD, Intel, NVIDIA)
+\item[SYCL] Intel GPU support via oneAPI
+\item[ROCm] AMD GPU support via HIP
+\end{description}
+
+This flexibility means you can run the same model on a MacBook's M3 chip, a consumer RTX 4090, or a server with no GPU at all.
+
+\paragraph{GGUF Format Integration}
+
+llama.cpp is the native runtime for GGUF, the format we covered in Chapter~\ref{ch:models}. The tight integration between format and runtime enables features like:
+\begin{itemize}
+\item Memory-mapped model loading (near-instant startup for large models)
+\item Partial model loading for CPU/GPU hybrid inference
+\item Runtime quantization of higher-precision models
+\end{itemize}
 
 \subsection{Building and Installation}
 \label{subsec:llama-cpp-install}
 
-% TODO: Compilation options
-% - CPU-only build
-% - CUDA build
-% - Metal build
-% - Compilation flags
+llama.cpp requires compilation from source, though pre-built binaries are available for common platforms. Building from source gives you control over which backends are enabled.
+
+\paragraph{Basic Build (CPU Only)}
+
+\begin{lstlisting}[language=bash]
+git clone https://github.com/ggml-org/llama.cpp
+cd llama.cpp
+cmake -B build
+cmake --build build --config Release -j
+\end{lstlisting}
+
+This produces executables in \texttt{build/bin/}, including \texttt{llama-cli} (interactive mode) and \texttt{llama-server} (HTTP API).
+
+\paragraph{CUDA Build (NVIDIA GPUs)}
+
+\begin{lstlisting}[language=bash]
+cmake -B build -DGGML_CUDA=ON
+cmake --build build --config Release -j
+\end{lstlisting}
+
+Requires the CUDA toolkit. For multi-GPU, all visible GPUs are used automatically.
+
+\paragraph{Metal Build (Apple Silicon)}
+
+\begin{lstlisting}[language=bash]
+cmake -B build -DGGML_METAL=ON
+cmake --build build --config Release -j
+\end{lstlisting}
+
+Metal is enabled by default on macOS, leveraging Apple's GPU for significant speedups over CPU-only inference.
+
+\paragraph{Key Build Options}
+
+\begin{lstlisting}[language=bash]
+# Optimize for your specific CPU (recommended)
+-DGGML_NATIVE=ON
+
+# Enable OpenBLAS for better CPU matrix multiplication
+-DGGML_OPENBLAS=ON
+
+# Enable Vulkan for cross-platform GPU support
+-DGGML_VULKAN=ON
+
+# Enable flash attention (faster, uses less memory)
+-DGGML_FLASH_ATTN=ON
+\end{lstlisting}
 
 \subsection{Server Mode}
 \label{subsec:llama-cpp-server}
 
-% TODO: Running as a server
-% - Command line options
-% - API compatibility (OpenAI-like)
-% - Configuration parameters
+For integration with applications, \texttt{llama-server} provides an HTTP API with OpenAI-compatible endpoints. This makes llama.cpp a drop-in replacement for many OpenAI SDK-based applications.
+
+\paragraph{Basic Server Launch}
 
 \begin{programcode}{llama.cpp Server Launch}
 \begin{lstlisting}[language=bash]
@@ -168,52 +488,99 @@ curl http://localhost:11434/api/embeddings -d '{
 \subsection{Advanced Configuration}
 \label{subsec:llama-cpp-advanced}
 
-% TODO: Performance tuning
-% - Layer offloading
-% - Thread configuration
-% - Memory mapping
-% - Batch size tuning
+llama.cpp provides fine-grained control over resource usage and performance.
+
+\paragraph{Layer Offloading}
+
+The \texttt{-ngl} (number of GPU layers) parameter controls how many transformer layers run on GPU versus CPU. This enables inference on GPUs with insufficient VRAM:
+
+\begin{lstlisting}[language=bash]
+# Full GPU offload (all 35 layers for a 7B model)
+./llama-server -m model.gguf -ngl 35
+
+# Partial offload (20 layers on GPU, rest on CPU)
+./llama-server -m model.gguf -ngl 20
+
+# CPU only
+./llama-server -m model.gguf -ngl 0
+\end{lstlisting}
+
+Start with full offload; reduce if you encounter out-of-memory errors.
+
+\paragraph{Threading and Parallelism}
+
+\begin{lstlisting}[language=bash]
+-t 8          # Threads for generation (default: all cores)
+-tb 4         # Threads for prompt processing
+--parallel 4  # Concurrent request slots
+\end{lstlisting}
+
+For CPU inference, match threads to physical cores. For GPU, fewer threads often perform better.
+
+\paragraph{Memory Settings}
+
+\begin{lstlisting}[language=bash]
+-c 8192       # Context window size
+-b 512        # Batch size for prompt processing
+--mlock       # Lock model in RAM (prevents swapping)
+\end{lstlisting}
 
 \subsection{When to Use llama.cpp}
 \label{subsec:llama-cpp-when}
 
-% TODO: Use cases
-% - CPU inference
-% - Mixed CPU/GPU
-% - Custom deployments
-% - Resource-constrained environments
-% - Edge deployments
+llama.cpp shines in scenarios where flexibility and broad hardware support matter more than maximum throughput:
+
+\paragraph{CPU-Only Inference}
+No GPU? No problem. llama.cpp delivers usable performance on modern CPUs, especially with quantized models. A Q4\_K\_M 7B model runs at 10-20 tokens/second on a good desktop CPU.
+
+\paragraph{Mixed CPU/GPU Deployments}
+When your GPU can't fit the entire model, partial offloading lets you use what GPU memory you have while falling back to CPU for remaining layers.
+
+\paragraph{Edge and Embedded}
+The minimal dependencies and small binary size make llama.cpp ideal for edge deployments---from Raspberry Pi to industrial systems.
+
+\paragraph{Maximum Control}
+If you need to tune every parameter, integrate with custom code, or support unusual hardware, llama.cpp's flexibility is unmatched.
+
+\paragraph{When NOT to Use llama.cpp}
+For high-throughput production serving many concurrent users, vLLM or SGLang provide better performance through continuous batching and PagedAttention. llama.cpp's batching is more limited.
 
 % =============================================================================
-\section{vLLM: Production Performance}
-\label{sec:vllm}
+\section{Production Engines: vLLM, SGLang, and TensorRT-LLM}
+\label{sec:production-engines}
 % =============================================================================
 
-% TODO: vLLM deep dive
+For serving many concurrent users with maximum throughput, you need production-grade engines. These engines implement continuous batching, PagedAttention, and hardware-specific optimizations that deliver 2-10x higher throughput than simpler solutions. We cover three leading options: vLLM (the current default choice), SGLang (optimized for structured generation), and TensorRT-LLM (NVIDIA's performance leader).
 
-\subsection{Key Innovation: Paged Attention}
-\label{subsec:vllm-paged-attention}
+\subsection{vLLM}
+\label{subsec:vllm}
 
-% TODO: Explain paged attention
-% - Memory fragmentation problem
-% - How paged attention solves it
-% - Throughput improvements
+vLLM~\cite{kwon2023vllm}, developed at UC Berkeley and released in 2023, introduced PagedAttention and has become the de facto standard for production LLM serving. It's Python-native, easy to deploy, and actively maintained.
 
-\subsection{Continuous Batching}
-\label{subsec:vllm-continuous-batching}
+\paragraph{Key Innovations}
 
-% TODO: Dynamic batching explanation
-% - Traditional batching limitations
-% - How continuous batching works
-% - Throughput vs latency trade-offs
+We covered PagedAttention and continuous batching in Section~\ref{sec:inference-principles}. vLLM pioneered both:
 
-\subsection{Installation and Setup}
-\label{subsec:vllm-install}
+\begin{itemize}
+\item \textbf{PagedAttention}: Near-zero memory fragmentation, enabling 2-4x more concurrent requests
+\item \textbf{Continuous batching}: Requests join and leave the batch dynamically, maximizing GPU utilization
+\item \textbf{Prefix caching}: Common prefixes (like system prompts) are cached and shared across requests
+\item \textbf{Speculative decoding}: Optional draft model acceleration for compatible workloads
+\end{itemize}
 
-% TODO: Setup instructions
-% - pip install
-% - Docker deployment
-% - GPU requirements
+\paragraph{Installation}
+
+\begin{lstlisting}[language=bash]
+# Basic installation
+pip install vllm
+
+# With specific CUDA version
+pip install vllm --extra-index-url https://download.pytorch.org/whl/cu121
+\end{lstlisting}
+
+vLLM requires NVIDIA GPUs with CUDA. Minimum recommended: RTX 3090 or better for 7B models.
+
+\paragraph{Server Launch}
 
 \begin{programcode}{vLLM Server Launch}
 \begin{lstlisting}[language=bash]
@@ -233,126 +600,235 @@ docker run --gpus all \
 \end{lstlisting}
 \end{programcode}
 
-\subsection{API and OpenAI Compatibility}
-\label{subsec:vllm-api}
+\paragraph{Performance Tuning}
 
-% TODO: API reference
-% - OpenAI-compatible endpoints
-% - /v1/completions
-% - /v1/chat/completions
-% - /v1/embeddings
+Key parameters for optimizing vLLM:
 
-\subsection{Performance Tuning}
-\label{subsec:vllm-tuning}
+\begin{lstlisting}[language=bash]
+python -m vllm.entrypoints.openai.api_server \
+  --model meta-llama/Llama-3.2-7b-instruct \
+  --tensor-parallel-size 2 \      # Split across 2 GPUs
+  --max-model-len 8192 \          # Maximum context length
+  --gpu-memory-utilization 0.90 \ # Use 90% of GPU memory
+  --dtype auto \                  # Auto-select precision
+  --enable-prefix-caching \       # Cache common prefixes
+  --max-num-seqs 256              # Max concurrent sequences
+\end{lstlisting}
 
-% TODO: Optimization parameters
-% - tensor-parallel-size
-% - max-model-len
-% - gpu-memory-utilization
-% - dtype options
+\begin{description}
+\item[tensor-parallel-size] Number of GPUs to split the model across. Required for models larger than single GPU memory.
+\item[gpu-memory-utilization] Fraction of GPU memory to use. Higher values allow more concurrent requests but risk OOM.
+\item[max-model-len] Limits context length. Lower values reduce memory usage.
+\item[enable-prefix-caching] Dramatically improves throughput when requests share common prefixes.
+\end{description}
 
-\subsection{When to Use vLLM}
-\label{subsec:vllm-when}
+\paragraph{When to Use vLLM}
 
-% TODO: Use cases
-% - High-throughput production
-% - Multiple concurrent users
-% - When latency matters
-% - Multi-GPU deployments
+vLLM is the default choice for production GPU deployments. Use it when:
+\begin{itemize}
+\item Serving 10+ concurrent users
+\item Throughput matters more than single-request latency
+\item You have NVIDIA GPUs (compute capability 7.0+)
+\item You want OpenAI API compatibility
+\end{itemize}
 
 \begin{svgraybox}
 \textbf{vLLM Strengths:}
 \begin{itemize}
-\item 2-4x higher throughput than naive implementations
-\item Continuous batching for efficient GPU utilization
-\item OpenAI API compatibility
-\item Multi-GPU support (tensor parallelism)
+\item 2-4x higher throughput than naive batching
+\item Excellent documentation and community
+\item Easy deployment (pip install, Docker)
+\item Broad model support (Llama, Mistral, Qwen, etc.)
 \end{itemize}
 
 \textbf{vLLM Limitations:}
 \begin{itemize}
-\item GPU-only (no CPU inference)
-\item More complex setup
-\item Higher memory overhead
-\item Limited quantization support (improving)
+\item Python runtime overhead
+\item Quantization support behind TensorRT-LLM
+\item CPU inference is experimental (GPU recommended for production)
 \end{itemize}
+
+\textbf{Note:} vLLM supports NVIDIA CUDA, AMD ROCm, and experimental CPU backends as of late 2024.
 \end{svgraybox}
-
-% =============================================================================
-\section{Other Engines Worth Knowing}
-\label{sec:other-engines}
-% =============================================================================
-
-\subsection{TensorRT-LLM}
-\label{subsec:tensorrt-llm}
-
-% TODO: NVIDIA's optimized engine
-% - When to use
-% - Strengths and limitations
-
-\subsection{Text Generation Inference (TGI)}
-\label{subsec:tgi}
-
-% TODO: HuggingFace's engine
-% - When to use
-% - Comparison to vLLM
 
 \subsection{SGLang}
 \label{subsec:sglang}
 
-% TODO: Newer alternative
-% - Structured generation
-% - Performance claims
+SGLang~\cite{zheng2024sglang} (Structured Generation Language), developed at UC Berkeley in 2024, builds on vLLM's foundation while adding powerful features for structured output and complex generation patterns.
+
+\paragraph{Key Features}
+
+\begin{description}
+\item[RadixAttention] An evolution of prefix caching that efficiently handles branching conversation trees and parallel generation.
+\item[Constrained Decoding] Native support for JSON schemas, regular expressions, and grammar constraints without external libraries.
+\item[Frontend Language] A Python DSL for expressing complex generation patterns like multi-turn conversations, parallel calls, and structured outputs.
+\end{description}
+
+\paragraph{When to Choose SGLang}
+
+SGLang excels when you need:
+\begin{itemize}
+\item Structured JSON output with schema validation
+\item Complex agentic workflows with branching
+\item Function calling with guaranteed valid outputs
+\item State-of-the-art throughput (often faster than vLLM)
+\end{itemize}
+
+\begin{lstlisting}[language=bash]
+# Installation
+pip install sglang[all]
+
+# Server launch
+python -m sglang.launch_server \
+  --model meta-llama/Llama-3.2-7b-instruct \
+  --port 8000
+\end{lstlisting}
+
+SGLang provides OpenAI-compatible endpoints, making it a drop-in replacement for vLLM with additional structured generation capabilities.
+
+\subsection{TensorRT-LLM}
+\label{subsec:tensorrt-llm}
+
+TensorRT-LLM~\cite{nvidia2024trtllm} is NVIDIA's optimized inference engine, delivering maximum performance on NVIDIA hardware through aggressive compilation and optimization.
+
+\paragraph{How It Works}
+
+Unlike vLLM's Python-based approach, TensorRT-LLM compiles models into optimized TensorRT engines:
+\begin{enumerate}
+\item Convert model to TensorRT-LLM format
+\item Compile with hardware-specific optimizations
+\item Deploy the compiled engine
+\end{enumerate}
+
+This compilation step takes time but produces faster inference.
+
+\paragraph{Performance Advantages}
+
+\begin{itemize}
+\item Best-in-class throughput on NVIDIA GPUs (often 20-50\% faster than vLLM)
+\item Superior FP8 and INT4 quantization support
+\item Optimized for H100, A100, and datacenter GPUs
+\item In-flight batching (NVIDIA's continuous batching implementation)
+\end{itemize}
+
+\paragraph{Trade-offs}
+
+\begin{itemize}
+\item More complex setup (compilation required)
+\item Longer iteration cycles (recompile for changes)
+\item NVIDIA-only (obviously)
+\item Steeper learning curve
+\end{itemize}
+
+\begin{lstlisting}[language=bash]
+# Using NVIDIA's Triton server with TensorRT-LLM backend
+docker run --gpus all -p 8000:8000 \
+  nvcr.io/nvidia/tritonserver:24.01-trtllm-python-py3 \
+  --model-repository=/models
+\end{lstlisting}
+
+\paragraph{When to Choose TensorRT-LLM}
+
+Use TensorRT-LLM when:
+\begin{itemize}
+\item You need absolute maximum throughput
+\item Running on datacenter GPUs (H100, A100)
+\item Model configuration is stable (infrequent changes)
+\item You have engineering resources for the complexity
+\end{itemize}
+
+\subsection{Text Generation Inference (TGI)}
+\label{subsec:tgi}
+
+HuggingFace's TGI is a Rust-based inference server with good performance and tight integration with the HuggingFace ecosystem. It's a solid choice if you're already invested in HuggingFace tooling, though vLLM has generally overtaken it in performance and adoption.
 
 % =============================================================================
 \section{Engine Comparison and Selection}
 \label{sec:engine-comparison}
 % =============================================================================
 
-% TODO: Decision framework
+With five major engines covered, how do you choose? This section provides a comparison matrix and decision framework.
 
 \subsection{Comparison Matrix}
 \label{subsec:engine-matrix}
 
-% TODO: Comprehensive comparison table
-% | Feature | Ollama | llama.cpp | vLLM |
-% | Ease of use | Excellent | Good | Moderate |
-% | Throughput | Low | Medium | High |
-% | CPU support | Yes | Yes | No |
-% | Batching | Basic | Basic | Continuous |
-% | etc. |
+\begin{center}
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Feature} & \textbf{Ollama} & \textbf{llama.cpp} & \textbf{vLLM} & \textbf{SGLang} & \textbf{TRT-LLM} \\
+\midrule
+Ease of setup & Excellent & Good & Good & Good & Complex \\
+Throughput & Low & Medium & High & Highest & Highest \\
+CPU support & Yes & Yes & Experimental & No & No \\
+Apple Silicon & Yes & Yes & No & No & No \\
+AMD GPUs & No & Yes & Yes (ROCm) & No & No \\
+Continuous batch & No & No & Yes & Yes & Yes \\
+Structured output & Limited & No & Partial & Excellent & Limited \\
+OpenAI API & Yes & Yes & Yes & Yes & Via Triton \\
+Quantization & Via GGUF & All GGUF & AWQ, GPTQ & AWQ, GPTQ & FP8, INT4 \\
+Multi-GPU & Limited & Yes & Yes & Yes & Yes \\
+\bottomrule
+\end{tabular}
+\end{center}
 
 \subsection{Decision Framework}
 \label{subsec:engine-decision}
 
-% TODO: How to choose
-% - Development: Ollama
-% - CPU/Edge: llama.cpp
-% - Production GPU: vLLM
+Use this flowchart to select an engine:
 
-% =============================================================================
-\section{Hands-On: Running All Three Engines}
-\label{sec:hands-on-engines}
-% =============================================================================
+\begin{enumerate}
+\item \textbf{Do you need GPU inference?}
+  \begin{itemize}
+  \item No GPU available $\rightarrow$ \textbf{llama.cpp}
+  \item Apple Silicon only $\rightarrow$ \textbf{Ollama} or \textbf{llama.cpp}
+  \end{itemize}
 
-% TODO: Practical exercise
-% - Install and run each engine
-% - Same model, same prompts
-% - Measure throughput and latency
-% - Document differences
+\item \textbf{Is this for development or production?}
+  \begin{itemize}
+  \item Development/prototyping $\rightarrow$ \textbf{Ollama}
+  \item Production with <10 concurrent users $\rightarrow$ \textbf{llama.cpp} or \textbf{Ollama}
+  \item Production with 10+ concurrent users $\rightarrow$ Continue to step 3
+  \end{itemize}
+
+\item \textbf{Do you need structured output (JSON, function calling)?}
+  \begin{itemize}
+  \item Yes, heavily $\rightarrow$ \textbf{SGLang}
+  \item No or occasionally $\rightarrow$ Continue to step 4
+  \end{itemize}
+
+\item \textbf{What's your priority?}
+  \begin{itemize}
+  \item Ease of deployment $\rightarrow$ \textbf{vLLM}
+  \item Maximum throughput with stable config $\rightarrow$ \textbf{TensorRT-LLM}
+  \item Balance of throughput and flexibility $\rightarrow$ \textbf{vLLM} or \textbf{SGLang}
+  \end{itemize}
+\end{enumerate}
+
+\begin{svgraybox}
+\textbf{The Default Recommendations:}
+\begin{itemize}
+\item \textbf{Just getting started}: Ollama
+\item \textbf{Edge/embedded/CPU}: llama.cpp
+\item \textbf{Production GPU serving}: vLLM
+\item \textbf{Agentic/structured output}: SGLang
+\item \textbf{Maximum performance, NVIDIA datacenter}: TensorRT-LLM
+\end{itemize}
+\end{svgraybox}
 
 % =============================================================================
 \section{Summary}
-\label{sec:ch04-summary}
+\label{sec:ch05-summary}
 % =============================================================================
 
 \begin{important}{Key Takeaways}
 \begin{itemize}
-\item Ollama excels at simplicity and developer experience
-\item llama.cpp provides maximum flexibility, especially for CPU inference
-\item vLLM delivers highest throughput for GPU-based production
-\item Engine choice depends on your deployment context and requirements
-\item All three expose HTTP APIs that your control plane can integrate with
+\item Inference engines transform model weights into running services---the choice matters as much as model selection
+\item \textbf{Ollama} excels at simplicity and developer experience for getting started quickly
+\item \textbf{llama.cpp} provides maximum flexibility for CPU, edge, and hybrid deployments
+\item \textbf{vLLM} delivers high throughput through PagedAttention and continuous batching
+\item \textbf{SGLang} extends vLLM with superior structured output and constrained generation
+\item \textbf{TensorRT-LLM} offers maximum performance on NVIDIA datacenter hardware
+\item All engines expose OpenAI-compatible APIs, enabling your control plane to swap backends without code changes
 \end{itemize}
 \end{important}
 

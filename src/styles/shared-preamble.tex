@@ -29,6 +29,19 @@
 \usepackage{amsmath}
 \usepackage{tikz}
 \usetikzlibrary{positioning}
+\usepackage{enumitem}
+
+% Custom description list with bullet + bold label + colon
+% Renders as: • Model Loading: Description text here...
+\setlist[description]{
+  labelwidth=!,
+  itemsep=0.5em,
+  before=\vspace{0.3em},
+  font=\normalfont\textbullet~\bfseries,
+  style=nextline
+}
+% Add colon after description labels
+\renewcommand{\descriptionlabel}[1]{\hspace{\labelsep}\textbullet~\textbf{#1:}}
 
 % Code listing style for Go
 \lstdefinelanguage{Go}{
@@ -74,7 +87,7 @@
   filecolor=magenta,
   urlcolor=cyan,
   pdftitle={Inference is all you need (Title TBD)},
-  pdfauthor={Author Name},
+  pdfauthor={Sriram Panyam},
   pdfsubject={AI Infrastructure, Machine Learning Operations},
   pdfkeywords={AI, inference, LLM, GPU, self-hosted, control plane}
 }
