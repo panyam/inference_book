@@ -1,4 +1,4 @@
-# Self-Hosted AI Inference: Master Book Guide
+# Inference is all you need: Master Book Guide
 
 ## Document Purpose
 

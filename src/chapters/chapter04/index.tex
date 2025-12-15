@@ -37,7 +37,7 @@ A neural network model file must store everything needed to reconstruct the mode
 \item[Tokenizer] (Optional) The vocabulary and encoding rules that convert text to token IDs. Often stored separately but sometimes bundled.
 \end{description}
 
-\input{figures/diagram01}
+\input{chapters/chapter04/diagram01}
 
 \subsection{How Architecture Connects to Weights}
 \label{subsec:architecture-weights}
@@ -120,7 +120,7 @@ Multiply by 32 layers: $\sim$13.3 GB. Add embeddings ($\sim$1 GB) and the output
 
 When running inference, GPU memory holds more than just weights:
 
-\input{figures/diagram03}
+\input{chapters/chapter04/diagram03}
 
 The computation flows through layers sequentially. For each token generated:
 \begin{enumerate}
@@ -221,7 +221,7 @@ Model files should not execute code during loading. They should also detect corr
 \item \textbf{Version markers}: Identify format version for backward compatibility
 \end{itemize}
 
-\input{figures/diagram02}
+\input{chapters/chapter04/diagram02}
 
 With these principles in mind, let's examine how the major formats implement them.
 
